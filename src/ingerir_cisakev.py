@@ -9,7 +9,8 @@ URL = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilit
 
 
 def baixar():
-    resposta = requests.get(URL, timeout=30)
+    print("Baixando catálogo CISA KEV...")
+    resposta = requests.get(URL, timeout=60)
     resposta.raise_for_status()
 
     conteudo = resposta.content

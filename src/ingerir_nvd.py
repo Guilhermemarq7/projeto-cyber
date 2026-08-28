@@ -10,9 +10,10 @@ ANOS = [2024, 2025, 2026]
 
 
 def baixar(ano: int):
+    print(f"Baixando feed NVD {ano}...")
     url = f"{URL_BASE}{ano}.json.gz"
 
-    resposta = requests.get(url, timeout=30)
+    resposta = requests.get(url, timeout=60)
     resposta.raise_for_status()
 
     conteudo_compactado = resposta.content

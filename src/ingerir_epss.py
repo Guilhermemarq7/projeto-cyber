@@ -10,7 +10,8 @@ URL = "https://epss.cyentia.com/epss_scores-current.csv.gz"
 
 
 def baixar():
-    resposta = requests.get(URL, timeout=30)
+    print("Baixando arquivo diário do EPSS...")
+    resposta = requests.get(URL, timeout=60)
     resposta.raise_for_status()
 
     conteudo_compactado = resposta.content
