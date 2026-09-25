@@ -7,6 +7,18 @@ dados/ouro/*
 # Excecao: mantem as pastas visiveis no GitHub, mesmo vazias.
 !dados/**/.gitkeep
 
+# Excecao: a proveniencia e registro historico, nao se reconstroi igual
+# ao rodar o script de novo (Aula 5, slide "O que vai para o GitHub").
+# Aplicado tambem na bronze, pelo mesmo motivo -- a professora so mostrou
+# o exemplo da prata, mas a logica e a mesma (decisao a confirmar com ela).
+!dados/prata/proveniencia.jsonl
+!dados/bronze/**/proveniencia.jsonl
+
+# Relatorios de perfilamento (Aula 4, Passo 5): a Bronze mais o codigo
+# reproduzem o relatorio a qualquer momento. O que sobe e a conclusao
+# que voce tirou dele no README, nao o HTML gerado.
+relatorios/
+
 # Arquivos gerados pelo Python
 __pycache__/
 *.pyc
@@ -21,4 +33,3 @@ venv/
 
 # Credenciais: nunca versione senhas ou chaves de acesso
 .env
-kaggle.json
