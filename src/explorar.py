@@ -17,6 +17,14 @@ FONTES_NVD = [
     (Path("dados/bronze/nvd"), "nvd_2026_*.json"),
 ]
 
+# Politica LOCAL do projeto para escolher uma unica versao CVSS.
+# Esta ordem nao representa uma precedencia oficial do NVD.
+ORDEM_CVSS = (
+    "cvssMetricV40",
+    "cvssMetricV31",
+    "cvssMetricV30",
+    "cvssMetricV2",
+)
 
 def mais_recente(pasta: Path, padrao: str) -> Path:
     arquivos = sorted(pasta.glob(padrao))
@@ -34,24 +42,28 @@ def descricao_en(cve: dict):
     return None
 
 
-def metrica_primaria(cve: dict):
-    # Prioridade de métricas CVSS conforme schema do NVD:
-    # 1. cvssMetricV40 (CVSS 4.0 - mais recente e preciso)
-    # 2. cvssMetricV31 (CVSS 3.1 - maior volume)
-    # 3. cvssMetricV30
-    # 4. cvssMetricV2
-    ordem_prioridade = ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
+def selecionar_metrica_cvss(cve: dict):
+    """Seleciona uma metrica CVSS pela politica local do projeto.
 
-    for versao in ordem_prioridade:
-        lista_metricas = cve.get("metrics", {}).get(versao, [])
+    A politica prefere a versao mais nova disponivel e, dentro dela,
+    utiliza a primeira metrica que possui baseScore.
 
-        for m in lista_metricas:
-            dados = m.get("cvssData", {})
+    Essa ordem e uma decisao do projeto, nao uma precedencia oficial do NVD.
+    """
+    metricas = cve.get("metrics", {})
+
+    for versao in ORDEM_CVSS:
+        lista_metricas = metricas.get(versao, [])
+
+        for metrica in lista_metricas:
+            dados = metrica.get("cvssData", {})
             score = dados.get("baseScore")
 
+            if score is None:
+                continue
+
             if versao == "cvssMetricV2":
-                # Na especificação CVSS v2, 'baseSeverity' fica na raiz do objeto da métricas (m)
-                severidade = m.get("baseSeverity")
+                severidade = metrica.get("baseSeverity")
             else:
                 severidade = dados.get("baseSeverity")
 
@@ -84,7 +96,7 @@ def gerar(caminho: Path):
         registros = []
         for item in dados_brutos.get("vulnerabilities", []):
             cve = item["cve"]
-            score, severidade, versao_cvss = metrica_primaria(cve)
+            score, severidade, versao_cvss = selecionar_metrica_cvss(cve)
             registros.append({
                 "id": cve.get("id"),
                 "sourceIdentifier": cve.get("sourceIdentifier"),

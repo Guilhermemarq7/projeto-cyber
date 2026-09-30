@@ -21,7 +21,7 @@ def baixar():
 def salvar(dados):
     BRONZE.mkdir(parents=True, exist_ok=True)
 
-    hoje = datetime.now(timezone.utc).date().strftime("%Y%m%d")
+    hoje = datetime.now(timezone.utc).astimezone().date().strftime("%Y%m%d")
     destino = BRONZE / f"cisa_kev_{hoje}.csv"
 
     with destino.open("wb") as arquivo:

@@ -18,12 +18,6 @@ STATUS_ESPERADOS = {
     "Analyzed", "Modified", "Deferred", "Rejected",
 }
 
-# Politica LOCAL do projeto para reduzir varias metricas CVSS a uma unica coluna.
-# Nao e uma prioridade oficial do NVD. Mantemos a mesma regra usada na
-# exploracao da Aula 4 para nao mudar o significado de baseScore no meio do
-# projeto: versao mais nova disponivel e, dentro dela, primeira metrica valida.
-# Como a ordem do array nao e uma prioridade oficial, tambem preservamos source,
-# type, vectorString e a quantidade de metricas para tornar a escolha auditavel.
 ORDEM_CVSS = ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
 
 
