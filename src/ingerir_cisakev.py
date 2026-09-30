@@ -1,6 +1,6 @@
-from pathlib import Path
-from datetime import date, datetime
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 
@@ -21,7 +21,7 @@ def baixar():
 def salvar(dados):
     BRONZE.mkdir(parents=True, exist_ok=True)
 
-    hoje = date.today().strftime("%Y%m%d")
+    hoje = datetime.now(timezone.utc).date().strftime("%Y%m%d")
     destino = BRONZE / f"cisa_kev_{hoje}.csv"
 
     with destino.open("wb") as arquivo:
@@ -36,7 +36,7 @@ def registrar(destino):
     info = {
         "fonte": URL,
         "arquivo_bronze": destino.name,
-        "extraido_em": datetime.now().isoformat(),
+        "extraido_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 
     caminho = BRONZE / "proveniencia.jsonl"
