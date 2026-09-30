@@ -1,10 +1,10 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pandas as pd
 
-import utils
 import limpeza
+import utils
 
 BRONZE = Path("dados/bronze/nvd")
 PRATA = Path("dados/prata")

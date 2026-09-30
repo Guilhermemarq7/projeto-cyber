@@ -4,9 +4,9 @@ Diferente de limpeza.py, aqui NAO entra nada que trate/corrija dado --
 sao funcoes de infraestrutura (achar arquivo, registrar proveniencia)
 que qualquer script do projeto pode precisar, tenha ou nao limpeza.
 """
-from pathlib import Path
-from datetime import datetime
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
 
 def mais_recente(pasta: Path, padrao: str) -> Path:
@@ -32,7 +32,7 @@ def registrar(pasta_prata: Path, origem, destino, antes, depois, decisoes):
         "linhas_antes": antes,
         "linhas_depois": depois,
         "decisoes": decisoes,
-        "transformado_em": datetime.now().isoformat(timespec="seconds"),
+        "transformado_em": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     caminho = pasta_prata / "proveniencia.jsonl"
     with caminho.open("a", encoding="utf-8") as f:

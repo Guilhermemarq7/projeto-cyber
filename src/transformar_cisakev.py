@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
-import utils
 import limpeza
+import utils
 
 BRONZE = Path("dados/bronze/cisa_kev")
 PRATA = Path("dados/prata")
