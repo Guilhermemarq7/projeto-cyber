@@ -35,15 +35,11 @@ def descricao_en(cve: dict):
 
 
 def metrica_primaria(cve: dict):
-    # Ordem de prioridade CONFIRMADA pela auditoria de schema (auditar_schema_nvd_completo.py)
-    # sobre os 3 arquivos reais (136.468 CVEs no total):
-    #   cvssMetricV40: 32.286   -- padrão mais recente (CVSS 4.0)
-    #   cvssMetricV31: 158.557  -- mais comum no geral
-    #   cvssMetricV30: 2.790
-    #   cvssMetricV2:  13.257   -- formato mais antigo
-    # cvssMetricV40 é colocado primeiro por ser a revisão mais atual do
-    # padrão CVSS, mesmo tendo menos ocorrências que a V31 -- quando as duas
-    # existirem para o mesmo CVE, a V40 é a mais precisa e atual.
+    # Prioridade de métricas CVSS conforme schema do NVD:
+    # 1. cvssMetricV40 (CVSS 4.0 - mais recente e preciso)
+    # 2. cvssMetricV31 (CVSS 3.1 - maior volume)
+    # 3. cvssMetricV30
+    # 4. cvssMetricV2
     ordem_prioridade = ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
 
     for versao in ordem_prioridade:
@@ -54,12 +50,7 @@ def metrica_primaria(cve: dict):
             score = dados.get("baseScore")
 
             if versao == "cvssMetricV2":
-                # CVSS v2 tem uma estrutura diferente das demais versões:
-                # 'baseSeverity' fica no nível do objeto da métrica (m),
-                # não dentro de 'cvssData'. Isso só foi descoberto rodando
-                # a auditoria de schema sobre o dado real -- sem ela, essa
-                # branch devolveria None silenciosamente para todo CVE que
-                # caísse no fallback de v2.
+                # Na especificação CVSS v2, 'baseSeverity' fica na raiz do objeto da métricas (m)
                 severidade = m.get("baseSeverity")
             else:
                 severidade = dados.get("baseSeverity")
@@ -67,6 +58,18 @@ def metrica_primaria(cve: dict):
             return score, severidade, versao
 
     return None, None, None
+
+
+def cwes(cve: dict):
+    # Extrai os identificadores CWE (ex.: "CWE-79, CWE-89") para padronização com a base CISA KEV
+    codigos = []
+    for fraqueza in cve.get("weaknesses", []):
+        for desc in fraqueza.get("description", []):
+            if desc.get("lang") == "en":
+                valor = desc.get("value")
+                if valor and valor not in codigos:
+                    codigos.append(valor)
+    return ", ".join(codigos) if codigos else None
 
 
 def gerar(caminho: Path):
@@ -94,12 +97,12 @@ def gerar(caminho: Path):
                 "cvss_versao_usada": versao_cvss,
                 "num_referencias": len(cve.get("references", [])),
                 "num_fraquezas": len(cve.get("weaknesses", [])),
+                "cwes": cwes(cve),
             })
 
         df = pd.DataFrame(registros)
 
-        # TESTE: minimal=False para ver se o dado já achatado (sem listas/dicts)
-        # roda em tempo razoável sem o problema original de correlação sobre objetos aninhados
+        # Gera profiling completo sobre os dados estruturados
         perfil = ProfileReport(df, title=caminho.name, minimal=False)
 
     else:
