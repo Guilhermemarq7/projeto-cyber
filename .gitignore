@@ -1,35 +1,65 @@
-# Dados: ficam apenas na sua maquina, nunca no GitHub.
-# O codigo do projeto reconstroi estes arquivos.
-dados/bronze/*
-dados/prata/*
-dados/ouro/*
+# ============================================================
+# DADOS
+# ============================================================
 
-# Excecao: mantem as pastas visiveis no GitHub, mesmo vazias.
+# Arquivos de dados ficam apenas na maquina local.
+# O codigo do projeto permite reconstruir as camadas.
+dados/bronze/**
+dados/prata/**
+dados/ouro/**
+
+# Mantem os diretorios acessiveis ao Git para que as excecoes
+# abaixo possam ser versionadas.
+!dados/bronze/**/
+!dados/prata/**/
+!dados/ouro/**/
+
+# Mantem as pastas da arquitetura visiveis mesmo quando vazias.
 !dados/**/.gitkeep
 
-# Excecao: a proveniencia e registro historico, nao se reconstroi igual
-# ao rodar o script de novo (Aula 5, slide "O que vai para o GitHub").
-# Aplicado tambem na bronze, pelo mesmo motivo -- a professora so mostrou
-# o exemplo da prata, mas a logica e a mesma (decisao a confirmar com ela).
-!dados/prata/proveniencia.jsonl
+# Proveniencia e registro historico devem ser versionados.
+# Aula 3: scripts, proveniencia e README sobem para o repositorio.
+# Aula 5: a proveniencia da Prata e historica e nao e reconstruida
+# de forma identica ao executar novamente a transformacao.
 !dados/bronze/**/proveniencia.jsonl
+!dados/prata/proveniencia.jsonl
 
-# Relatorios de perfilamento (Aula 4, Passo 5): a Bronze mais o codigo
-# reproduzem o relatorio a qualquer momento. O que sobe e a conclusao
-# que voce tirou dele no README, nao o HTML gerado.
+
+# ============================================================
+# RELATORIOS DE EXPLORACAO
+# ============================================================
+
+# Os relatorios de profiling sao gerados novamente a partir
+# da Bronze e do codigo. Os achados relevantes ficam no README.
 relatorios/
 
-# Arquivos gerados pelo Python
+
+# ============================================================
+# PYTHON
+# ============================================================
+
 __pycache__/
 *.pyc
 
-# Ambiente virtual
+
+# ============================================================
+# AMBIENTE VIRTUAL
+# ============================================================
+
 .venv/
 venv/
 
-# Configuracoes do editor
+
+# ============================================================
+# EDITORES / IDEs
+# ============================================================
+
 .vscode/
 .idea/
 
-# Credenciais: nunca versione senhas ou chaves de acesso
+
+# ============================================================
+# CREDENCIAIS E CONFIGURACOES LOCAIS
+# ============================================================
+
 .env
