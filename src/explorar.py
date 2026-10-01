@@ -26,10 +26,12 @@ ORDEM_CVSS = (
     "cvssMetricV2",
 )
 
-FONTE_NVD = "nvd@nist.gov"
+FONTE_NVD = "nvd@nist.gov" 
+# Identificador da fonte do NVD usado como criterio de preferencia na selecao CVSS.
 
 
 def descricao_en(cve: dict):
+    # Procura a descricao em ingles da CVE e retorna o texto; se nao existir, retorna None.
     for d in cve.get("descriptions", []):
         if d.get("lang") == "en":
             return d.get("value")
@@ -39,7 +41,8 @@ def descricao_en(cve: dict):
 
 def _chave_desempate_metrica(metrica):
     dados = metrica.get("cvssData", {})
-
+    # Cria uma chave para desempatar metricas que ainda ficaram empatadas.
+    # Nao define qual e "melhor"; so garante uma escolha deterministica.
     return (
         str(metrica.get("source") or "").casefold(),
         str(metrica.get("type") or "").casefold(),
@@ -49,12 +52,16 @@ def _chave_desempate_metrica(metrica):
 
 
 def selecionar_metrica_cvss(cve: dict):
+    # Escolhe uma metrica CVSS para representar a CVE.
+    # Tenta a versao mais nova, prefere Primary e depois fonte NVD.
+    # Se ainda houver mais de uma candidata, marca como ambiguo
+    # e usa uma regra fixa de desempate.
     metricas = cve.get("metrics", {})
 
     for versao in ORDEM_CVSS:
         lista = metricas.get(versao, [])
 
-        validas = [
+        validas = [ #remove métricas sem baseScore.
             metrica
             for metrica in lista
             if metrica.get("cvssData", {}).get("baseScore") is not None
@@ -108,7 +115,7 @@ def selecionar_metrica_cvss(cve: dict):
 
 def cwes(cve: dict):
     codigos = []
-
+    # Extrai os codigos CWE da CVE e remove repeticoes.
     for fraqueza in cve.get("weaknesses", []):
         for desc in fraqueza.get("description", []):
             if desc.get("lang") == "en":

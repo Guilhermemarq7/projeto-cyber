@@ -2,6 +2,8 @@
 
 
 def conferir_chave(df, chave):
+        # Verifica valores repetidos na coluna usada como chave,
+        # remove as duplicatas e retorna quantas foram removidas.
     envolvidas = df[chave].duplicated(keep=False)
 
     resultado = df.drop_duplicates(subset=chave).copy()
@@ -16,6 +18,8 @@ def conferir_chave(df, chave):
 
 
 def tirar_espacos(df):
+        # Remove espacos extras dos nomes das colunas
+        # e tambem dos valores de texto.
     df.columns = df.columns.str.strip()
 
     for coluna in df.select_dtypes(include="object"):
@@ -25,6 +29,8 @@ def tirar_espacos(df):
 
 
 def validar_faixa(df, coluna, minimo, maximo, remover=False):
+        # Verifica valores fora da faixa esperada e,
+        # se remover=True, exclui essas linhas.
     fora_da_faixa = (
         df[coluna].notna()
         & ~df[coluna].between(minimo, maximo)
@@ -45,6 +51,8 @@ def validar_faixa(df, coluna, minimo, maximo, remover=False):
 
 
 def validar_ordem_datas(df, coluna_inicio, coluna_fim):
+        # Verifica se a data final aparece antes da data inicial
+        # e conta quantos casos assim existem.
     ambas_preenchidas = (
         df[coluna_inicio].notna()
         & df[coluna_fim].notna()
@@ -66,6 +74,8 @@ def validar_ordem_datas(df, coluna_inicio, coluna_fim):
 
 
 def limites_iqr(serie):
+        # Calcula os limites inferior e superior pelo metodo do IQR,
+        # usando 1,5 vezes o intervalo interquartil.
     q1 = serie.quantile(0.25)
     q3 = serie.quantile(0.75)
     iqr = q3 - q1

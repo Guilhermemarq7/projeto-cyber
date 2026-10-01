@@ -39,6 +39,8 @@ def descricao_en(cve: dict):
 
 
 def _chave_desempate_metrica(metrica):
+        # Cria uma chave fixa para desempatar metricas CVSS
+        # que ainda ficaram equivalentes pelos criterios anteriores.
     dados = metrica.get("cvssData", {})
 
     return (
@@ -50,6 +52,10 @@ def _chave_desempate_metrica(metrica):
 
 
 def selecionar_metrica_cvss(cve: dict):
+        # Escolhe uma metrica CVSS para representar a CVE.
+        # Tenta a versao mais nova, prefere Primary e depois fonte NVD.
+        # Se ainda houver mais de uma candidata, marca como ambiguo
+        # e usa uma regra fixa de desempate.
     metricas = cve.get("metrics", {})
 
     for versao in ORDEM_CVSS:
@@ -108,6 +114,8 @@ def selecionar_metrica_cvss(cve: dict):
 
 
 def cwes(cve: dict):
+        # Extrai os codigos CWE em ingles, evita duplicados
+        # e junta os valores encontrados em uma unica string.
     codigos = []
 
     for fraqueza in cve.get("weaknesses", []):
@@ -182,6 +190,7 @@ def carregar():
 
 
 def diagnosticar_ausentes_por_status(df):
+    # Mostra em quais vulnStatus estao os CVEs que ficaram sem baseScore.
     sem_score = df[df["baseScore"].isna()]
     contagem = sem_score["vulnStatus"].value_counts()
 
@@ -193,6 +202,8 @@ def diagnosticar_ausentes_por_status(df):
 
 
 def conferir_vulnstatus(df):
+    # Compara os vulnStatus encontrados com os valores esperados
+    # e retorna qualquer status que nao estava previsto.
     inesperados = sorted(
         set(df["vulnStatus"].dropna().unique())
         - STATUS_ESPERADOS
@@ -207,6 +218,8 @@ def conferir_vulnstatus(df):
 
 
 def tratar_rejeitados(df):
+        # Remove os CVEs com vulnStatus Rejected
+        # e retorna quantos registros foram removidos.
     rejeitados = df["vulnStatus"] == "Rejected"
     quantidade = int(rejeitados.sum())
 
@@ -216,6 +229,8 @@ def tratar_rejeitados(df):
 
 
 def sinalizar_sem_cvss(df):
+        # Cria uma flag para identificar CVEs mantidos sem pontuacao CVSS
+        # e retorna quantos casos existem.
     df["sem_pontuacao_cvss"] = df["baseScore"].isna()
     quantidade = int(df["sem_pontuacao_cvss"].sum())
 
@@ -228,6 +243,8 @@ def sinalizar_sem_cvss(df):
 
 
 def derivar_vetor_ataque_rede(df):
+        # Cria uma coluna derivada indicando se o vetor CVSS possui AV:N,
+        # ou seja, se o Attack Vector da metrica selecionada e Network.
     df["vetor_ataque_rede"] = pd.Series(
         pd.NA,
         index=df.index,
@@ -261,6 +278,8 @@ def derivar_vetor_ataque_rede(df):
 
 
 def marcar_extremos_referencias(df):
+        # Usa os limites do IQR para sinalizar valores extremos
+        # em num_referencias, sem remover essas linhas.
     baixo, alto = limpeza.limites_iqr(
         df["num_referencias"]
     )
@@ -281,6 +300,8 @@ def marcar_extremos_referencias(df):
 
 
 def converter_tipos(df):
+        # Converte published e lastModified para datetime,
+        # identifica falhas de conversao e remove apenas essas linhas.
     novos_ausentes = {}
     falhas_conversao = pd.Series(False, index=df.index)
 

@@ -22,6 +22,8 @@ def carregar():
 
 
 def converter_tipos(df):
+        # Converte dateAdded e dueDate para datetime e conta
+        # quantos novos valores ausentes surgiram na conversao.
     novos_ausentes = {}
 
     for coluna in ["dateAdded", "dueDate"]:

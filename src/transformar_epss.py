@@ -22,6 +22,8 @@ def carregar():
 
 
 def converter_tipos(df):
+        # Converte epss e percentile para numerico,
+        # identifica falhas de conversao e remove essas linhas.
     novos_ausentes = {}
     falhas_conversao = pd.Series(False, index=df.index)
 
