@@ -1,2 +1,3 @@
 {"fonte": "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv", "arquivo_bronze": "cisa_kev_20260929.csv", "extraido_em": "2026-09-29T21:00:08.509091"}
 {"fonte": "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv", "arquivo_bronze": "cisa_kev_20260930.csv", "extraido_em": "2026-09-30T16:12:35.998237"}
+{"fonte": "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv", "arquivo_bronze": "cisa_kev_20261001.csv", "extraido_em": "2026-10-01T16:50:12+00:00"}

@@ -10,49 +10,81 @@ BRONZE = Path("dados/bronze/nvd")
 PRATA = Path("dados/prata")
 ANOS = [2024, 2025, 2026]
 
-# Valores atualmente documentados pelo NVD para vulnStatus/API.
-# O schema aceita string aberta, entao a lista serve como alarme para valor novo,
-# nao como prova de que qualquer valor diferente seja automaticamente invalido.
 STATUS_ESPERADOS = {
-    "Received", "Awaiting Analysis", "Undergoing Analysis",
-    "Analyzed", "Modified", "Deferred", "Rejected",
+    "Received",
+    "Awaiting Analysis",
+    "Undergoing Analysis",
+    "Analyzed",
+    "Modified",
+    "Deferred",
+    "Rejected",
 }
 
-ORDEM_CVSS = ("cvssMetricV40", "cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
+ORDEM_CVSS = (
+    "cvssMetricV40",
+    "cvssMetricV31",
+    "cvssMetricV30",
+    "cvssMetricV2",
+)
+
+FONTE_NVD = "nvd@nist.gov"
 
 
 def descricao_en(cve: dict):
     for d in cve.get("descriptions", []):
         if d.get("lang") == "en":
             return d.get("value")
+
     return None
 
 
+def _chave_desempate_metrica(metrica):
+    dados = metrica.get("cvssData", {})
+
+    return (
+        str(metrica.get("source") or "").casefold(),
+        str(metrica.get("type") or "").casefold(),
+        str(dados.get("vectorString") or ""),
+        str(dados.get("baseScore")),
+    )
+
+
 def selecionar_metrica_cvss(cve: dict):
-    """Seleciona uma metrica CVSS pela politica local ja usada na Aula 4.
-
-    Politica do projeto:
-    1. prefere a versao mais nova disponivel (4.0 > 3.1 > 3.0 > 2.0);
-    2. dentro da versao, usa a primeira metrica que possui baseScore.
-
-    O passo 2 NAO e uma precedencia oficial do NVD. Ele e mantido aqui para
-    preservar consistencia com o perfilamento ja feito. Por isso retornamos
-    tambem source, type, vectorString e a quantidade de metricas validas na
-    versao escolhida; se houver mais de uma, a selecao fica explicitamente
-    marcada como um ponto a investigar antes da modelagem.
-    """
     metricas = cve.get("metrics", {})
 
     for versao in ORDEM_CVSS:
         lista = metricas.get(versao, [])
+
         validas = [
-            m for m in lista
-            if m.get("cvssData", {}).get("baseScore") is not None
+            metrica
+            for metrica in lista
+            if metrica.get("cvssData", {}).get("baseScore") is not None
         ]
+
         if not validas:
             continue
 
-        escolhida = validas[0]
+        primarias = [
+            metrica
+            for metrica in validas
+            if metrica.get("type") == "Primary"
+        ]
+        candidatas = primarias or validas
+
+        da_nvd = [
+            metrica
+            for metrica in candidatas
+            if str(metrica.get("source") or "").casefold() == FONTE_NVD
+        ]
+        candidatas = da_nvd or candidatas
+
+        selecao_ambigua = len(candidatas) > 1
+
+        escolhida = min(
+            candidatas,
+            key=_chave_desempate_metrica,
+        )
+
         dados = escolhida.get("cvssData", {})
         score = dados.get("baseScore")
 
@@ -69,30 +101,36 @@ def selecionar_metrica_cvss(cve: dict):
             escolhida.get("type"),
             dados.get("vectorString"),
             len(validas),
+            selecao_ambigua,
         )
 
-    return None, None, None, None, None, None, 0
+    return None, None, None, None, None, None, 0, False
 
 
 def cwes(cve: dict):
     codigos = []
+
     for fraqueza in cve.get("weaknesses", []):
         for desc in fraqueza.get("description", []):
             if desc.get("lang") == "en":
                 valor = desc.get("value")
+
                 if valor and valor not in codigos:
                     codigos.append(valor)
+
     return ", ".join(codigos) if codigos else None
 
 
 def carregar():
-    # Os arquivos 2024/2025/2026 sao particoes complementares por prefixo
-    # do identificador CVE. Para cada ano, usamos a extracao bronze mais recente.
     registros = []
     origens = []
 
     for ano in ANOS:
-        caminho = utils.mais_recente(BRONZE, f"nvd_{ano}_*.json")
+        caminho = utils.mais_recente(
+            BRONZE,
+            f"nvd_{ano}_*.json",
+        )
+
         origens.append(caminho.name)
 
         with caminho.open("r", encoding="utf-8") as f:
@@ -100,6 +138,7 @@ def carregar():
 
         for item in dados_brutos.get("vulnerabilities", []):
             cve = item["cve"]
+
             (
                 score,
                 severidade,
@@ -108,108 +147,192 @@ def carregar():
                 tipo_cvss,
                 vetor_cvss,
                 num_metricas_cvss,
+                selecao_ambigua,
             ) = selecionar_metrica_cvss(cve)
 
-            registros.append({
-                "id": cve.get("id"),
-                "sourceIdentifier": cve.get("sourceIdentifier"),
-                "published": cve.get("published"),
-                "lastModified": cve.get("lastModified"),
-                "vulnStatus": cve.get("vulnStatus"),
-                "descricao_en": descricao_en(cve),
-                "baseScore": score,
-                "baseSeverity": severidade,
-                "cvss_versao_usada": versao_cvss,
-                "cvss_source": fonte_cvss,
-                "cvss_type": tipo_cvss,
-                "cvss_vector": vetor_cvss,
-                "cvss_num_metricas_na_versao": num_metricas_cvss,
-                "num_referencias": len(cve.get("references", [])),
-                "num_fraquezas": len(cve.get("weaknesses", [])),
-                "cwes": cwes(cve),
-            })
+            registros.append(
+                {
+                    "id": cve.get("id"),
+                    "sourceIdentifier": cve.get("sourceIdentifier"),
+                    "published": cve.get("published"),
+                    "lastModified": cve.get("lastModified"),
+                    "vulnStatus": cve.get("vulnStatus"),
+                    "descricao_en": descricao_en(cve),
+                    "baseScore": score,
+                    "baseSeverity": severidade,
+                    "cvss_versao_usada": versao_cvss,
+                    "cvss_source": fonte_cvss,
+                    "cvss_type": tipo_cvss,
+                    "cvss_vector": vetor_cvss,
+                    "cvss_num_metricas_na_versao": num_metricas_cvss,
+                    "cvss_selecao_ambigua": selecao_ambigua,
+                    "num_referencias": len(cve.get("references", [])),
+                    "num_fraquezas": len(cve.get("weaknesses", [])),
+                    "cwes": cwes(cve),
+                }
+            )
 
     df = pd.DataFrame(registros)
+
     print("lido:", ", ".join(origens), df.shape)
     print(df.columns.tolist())
     print(df.isna().sum())
+
     return df, origens
 
 
 def diagnosticar_ausentes_por_status(df):
-    """Mostra os status dos CVEs validos que continuam sem baseScore."""
     sem_score = df[df["baseScore"].isna()]
     contagem = sem_score["vulnStatus"].value_counts()
-    print("\nCVEs nao rejeitados sem baseScore, por vulnStatus:")
+
+    print("\nCVEs sem baseScore, por vulnStatus:")
     print(contagem)
-    print(f"Total nao rejeitado sem baseScore: {len(sem_score)}\n")
+    print(f"Total sem baseScore: {len(sem_score)}\n")
+
     return contagem.to_dict()
 
 
 def conferir_vulnstatus(df):
-    """Avisa sobre status fora da lista atualmente documentada pelo NVD."""
     inesperados = sorted(
-        set(df["vulnStatus"].dropna().unique()) - STATUS_ESPERADOS
+        set(df["vulnStatus"].dropna().unique())
+        - STATUS_ESPERADOS
     )
-    print("valores nao previstos em vulnStatus:", inesperados or "nenhum")
+
+    print(
+        "valores nao previstos em vulnStatus:",
+        inesperados or "nenhum",
+    )
+
     return inesperados
 
 
 def tratar_rejeitados(df):
-    """Remove CVEs com vulnStatus='Rejected', que nao sao registros CVE validos."""
-    e_rejeitado = df["vulnStatus"] == "Rejected"
-    print("rejeitados removidos:", int(e_rejeitado.sum()))
-    return df[~e_rejeitado].copy()
+    rejeitados = df["vulnStatus"] == "Rejected"
+    quantidade = int(rejeitados.sum())
+
+    print("rejeitados removidos:", quantidade)
+
+    return df.loc[~rejeitados].copy(), quantidade
 
 
 def sinalizar_sem_cvss(df):
-    """Mantem CVEs validos sem score e cria uma flag de qualidade.
-
-    A ausencia de score nao tem uma unica causa: pode estar ligada ao estado de
-    enriquecimento, a politica do NVD, a versao disponivel ou a fonte da metrica.
-    Por isso nao preenchemos nem removemos automaticamente.
-    """
     df["sem_pontuacao_cvss"] = df["baseScore"].isna()
+    quantidade = int(df["sem_pontuacao_cvss"].sum())
+
     print(
         "sem pontuacao CVSS (mantidos e sinalizados):",
-        int(df["sem_pontuacao_cvss"].sum()),
+        quantidade,
     )
-    return df
+
+    return df, quantidade
+
+
+def derivar_vetor_ataque_rede(df):
+    df["vetor_ataque_rede"] = pd.Series(
+        pd.NA,
+        index=df.index,
+        dtype="boolean",
+    )
+
+    possui_vetor = df["cvss_vector"].notna()
+
+    df.loc[possui_vetor, "vetor_ataque_rede"] = (
+        df.loc[possui_vetor, "cvss_vector"]
+        .str.contains(r"(?:^|/)AV:N(?:/|$)", regex=True, na=False)
+    )
+
+    quantidade_rede = int(
+        df["vetor_ataque_rede"].fillna(False).sum()
+    )
+    quantidade_sem_vetor = int(
+        df["vetor_ataque_rede"].isna().sum()
+    )
+
+    print(
+        "CVEs com vetor de ataque Network (AV:N):",
+        quantidade_rede,
+    )
+    print(
+        "CVEs sem vetor CVSS utilizavel para derivar a flag:",
+        quantidade_sem_vetor,
+    )
+
+    return df, quantidade_rede, quantidade_sem_vetor
 
 
 def marcar_extremos_referencias(df):
-    """Marca extremos de num_referencias pelo IQR, sem remover as linhas."""
-    baixo, alto = limpeza.limites_iqr(df["num_referencias"])
+    baixo, alto = limpeza.limites_iqr(
+        df["num_referencias"]
+    )
+
     df["num_referencias_extremo"] = (
-        (df["num_referencias"] < baixo) | (df["num_referencias"] > alto)
+        (df["num_referencias"] < baixo)
+        | (df["num_referencias"] > alto)
     )
+
+    quantidade = int(df["num_referencias_extremo"].sum())
+
     print(
-        "num_referencias extremos persistidos pelo IQR:",
-        int(df["num_referencias_extremo"].sum()),
+        "num_referencias extremos sinalizados pelo IQR:",
+        quantidade,
     )
-    return df
+
+    return df, quantidade
 
 
 def converter_tipos(df):
-    """Converte datas NVD e mede se a conversao criou novos ausentes."""
     novos_ausentes = {}
+    falhas_conversao = pd.Series(False, index=df.index)
 
     for coluna in ["published", "lastModified"]:
-        antes = int(df[coluna].isna().sum())
-        df[coluna] = pd.to_datetime(df[coluna], errors="coerce", utc=True)
-        depois = int(df[coluna].isna().sum())
-        novos = max(0, depois - antes)
-        novos_ausentes[coluna] = novos
-        print(f"{coluna}: novos ausentes apos conversao de data:", novos)
+        ausentes_antes = df[coluna].isna()
 
-    return df, novos_ausentes
+        df[coluna] = pd.to_datetime(
+            df[coluna],
+            errors="coerce",
+            utc=True,
+        )
+
+        falhas_coluna = (
+            ~ausentes_antes
+            & df[coluna].isna()
+        )
+
+        novos = int(falhas_coluna.sum())
+        novos_ausentes[coluna] = novos
+        falhas_conversao |= falhas_coluna
+
+        print(
+            f"{coluna}: novos ausentes apos conversao de data:",
+            novos,
+        )
+
+    removidas_conversao = int(falhas_conversao.sum())
+
+    if removidas_conversao:
+        print(
+            "linhas removidas por falha de conversao de data:",
+            removidas_conversao,
+        )
+        print(
+            df.loc[
+                falhas_conversao,
+                ["id", "published", "lastModified"],
+            ]
+        )
+        df = df.loc[~falhas_conversao].copy()
+
+    return df, novos_ausentes, removidas_conversao
 
 
 def salvar(df):
     PRATA.mkdir(parents=True, exist_ok=True)
+
     destino = PRATA / "nvd.parquet"
     df.to_parquet(destino, index=False)
+
     print("salvo em:", destino, df.shape)
+
     return destino
 
 
@@ -217,69 +340,129 @@ def main():
     df, origens = carregar()
     antes = len(df)
 
-    # Normaliza texto antes de conferir a chave, para nao esconder duplicata
-    # causada apenas por espaco sobrando.
     df = limpeza.tirar_espacos(df)
-    duplicadas = int(df["id"].duplicated().sum())
-    df = limpeza.conferir_chave(df, chave="id")
+
+    df, duplicadas = limpeza.conferir_chave(
+        df,
+        chave="id",
+    )
 
     inesperados = conferir_vulnstatus(df)
 
-    fora_faixa_score = int(
-        (df["baseScore"].notna() & ~df["baseScore"].between(0, 10)).sum()
+    df, rejeitados = tratar_rejeitados(df)
+
+    df, novos_ausentes_data, removidas_datas = converter_tipos(df)
+
+    df, fora_faixa_score = limpeza.validar_faixa(
+        df,
+        "baseScore",
+        0,
+        10,
+        remover=True,
     )
-    limpeza.validar_faixa(df, "baseScore", 0, 10)
 
-    rejeitados = int((df["vulnStatus"] == "Rejected").sum())
-    df = tratar_rejeitados(df)
-
-    # Agora o diagnostico responde exatamente sobre os CVEs que sobraram
-    # depois da remocao dos Rejected.
     diagnosticar_ausentes_por_status(df)
-    df = sinalizar_sem_cvss(df)
-    sem_cvss = int(df["sem_pontuacao_cvss"].sum())
 
-    # Aula 5: compara os dois metodos, mas persiste apenas a flag por IQR.
-    comparacao_extremos = limpeza.comparar_iqr_zscore(
-        df, "num_referencias", limite_z=3
+    df, sem_cvss = sinalizar_sem_cvss(df)
+
+    (
+        df,
+        vetor_ataque_rede,
+        vetor_ataque_rede_ausente,
+    ) = derivar_vetor_ataque_rede(df)
+
+    df, extremos_referencias = marcar_extremos_referencias(df)
+
+    multiplas_metricas = int(
+        (df["cvss_num_metricas_na_versao"] > 1).sum()
     )
-    df = marcar_extremos_referencias(df)
 
-    multiplas_metricas = int((df["cvss_num_metricas_na_versao"] > 1).sum())
-
-    df, novos_ausentes_data = converter_tipos(df)
+    selecoes_ambiguas = int(
+        df["cvss_selecao_ambigua"].sum()
+    )
 
     destino = salvar(df)
-    inesperados_txt = ", ".join(inesperados) if inesperados else "nenhum"
 
-    utils.registrar(PRATA, origens, destino, antes, len(df), [
-        "espacos removidos de colunas de texto antes da conferencia da chave",
-        f"chave 'id' conferida apos concatenar os 3 anos: {duplicadas} duplicata(s) encontrada(s) e removida(s)",
-        f"vulnStatus conferido contra os 7 valores atualmente documentados pelo NVD; valores nao previstos: {inesperados_txt}",
-        f"baseScore validado na faixa 0-10: {fora_faixa_score} valor(es) fora da faixa",
-        f"CVEs Rejected removidos: {rejeitados}",
-        f"CVEs validos sem baseScore mantidos e sinalizados em sem_pontuacao_cvss: {sem_cvss}",
-        (
-            "num_referencias comparado por IQR e z-score sem persistir a coluna z: "
-            f"IQR={comparacao_extremos['iqr']}, z-score={comparacao_extremos['zscore']}, "
-            f"somente IQR={comparacao_extremos['so_iqr']}, somente z-score={comparacao_extremos['so_zscore']}; "
-            "a flag persistida no Parquet e a do IQR"
-        ),
-        (
-            "published e lastModified convertidos para datetime UTC; "
-            f"novos ausentes criados pela conversao: published={novos_ausentes_data['published']}, "
-            f"lastModified={novos_ausentes_data['lastModified']}"
-        ),
-        (
-            "CVSS reduzido a um score pela mesma politica LOCAL usada no perfilamento da Aula 4: "
-            "versao mais nova disponivel e primeira metrica valida nessa versao. "
-            "A ordem do array nao e uma precedencia oficial do NVD; source, type e vectorString foram preservados para auditoria"
-        ),
-        f"registros com mais de uma metrica CVSS valida na versao selecionada: {multiplas_metricas}",
-        "versao, source, type e vectorString da metrica CVSS selecionada foram preservados; scores de versoes diferentes nao devem ser tratados como escala estatistica intercambiavel sem controle",
-        "codigos CWE extraidos como texto (coluna cwes), alem da contagem existente em num_fraquezas",
-        "arquivos dos 3 anos (2024, 2025, 2026) concatenados; os feeds anuais sao particionados pelo prefixo do CVE, nao pela data published",
-    ])
+    inesperados_txt = (
+        ", ".join(inesperados)
+        if inesperados
+        else "nenhum"
+    )
+
+    utils.registrar(
+        PRATA,
+        origens,
+        destino,
+        antes,
+        len(df),
+        [
+            "espacos removidos de colunas de texto antes da conferencia da chave",
+            (
+                "chave 'id' conferida apos concatenar os 3 anos: "
+                f"{duplicadas} duplicata(s) encontrada(s) e removida(s)"
+            ),
+            (
+                "vulnStatus conferido contra os valores esperados pelo projeto; "
+                f"valores nao previstos: {inesperados_txt}"
+            ),
+            f"CVEs Rejected removidos: {rejeitados}",
+            (
+                "published e lastModified convertidos para datetime UTC; "
+                f"falhas de conversao: published={novos_ausentes_data['published']}, "
+                f"lastModified={novos_ausentes_data['lastModified']}; "
+                f"linhas removidas por falha de conversao={removidas_datas}"
+            ),
+            (
+                "baseScore validado no dominio 0-10; "
+                f"{fora_faixa_score} linha(s) com score fora da faixa removida(s)"
+            ),
+            (
+                "CVEs mantidos sem baseScore foram sinalizados em "
+                f"sem_pontuacao_cvss: {sem_cvss}"
+            ),
+            (
+                "atributo derivado vetor_ataque_rede criado a partir do "
+                "componente AV da metrica CVSS selecionada; "
+                f"AV:N={vetor_ataque_rede}, "
+                f"sem vetor utilizavel={vetor_ataque_rede_ausente}; "
+                "a flag descreve Attack Vector=Network e nao significa, "
+                "por si so, exploracao bem-sucedida"
+            ),
+            (
+                "num_referencias teve extremos apenas sinalizados pelo criterio "
+                f"de 1,5 x IQR: {extremos_referencias} registro(s); "
+                "nenhuma linha foi removida por esse criterio"
+            ),
+            (
+                "politica LOCAL de selecao CVSS: prefere a versao mais nova "
+                "disponivel; dentro da versao prefere metricas Primary; "
+                "entre candidatas equivalentes prefere source nvd@nist.gov; "
+                "empates remanescentes sao resolvidos de forma deterministica "
+                "e marcados em cvss_selecao_ambigua"
+            ),
+            (
+                "metadados da metrica CVSS selecionada preservados em "
+                "cvss_source, cvss_type, cvss_vector e "
+                "cvss_num_metricas_na_versao"
+            ),
+            (
+                "registros com mais de uma metrica CVSS valida na versao "
+                f"selecionada: {multiplas_metricas}"
+            ),
+            (
+                "registros cuja selecao permaneceu ambigua apos as preferencias "
+                f"locais: {selecoes_ambiguas}"
+            ),
+            (
+                "codigos CWE extraidos como texto na coluna cwes, alem da "
+                "contagem em num_fraquezas"
+            ),
+            (
+                "arquivos NVD de 2024, 2025 e 2026 concatenados em uma unica "
+                "tabela da camada Prata"
+            ),
+        ],
+    )
 
 
 if __name__ == "__main__":
