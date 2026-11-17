@@ -1,17 +1,26 @@
 import gzip
 import json
 from datetime import datetime, timezone
-from pathlib import Path
+
+from config import (
+    BRONZE_NVD as BRONZE,
+    ANOS_NVD as ANOS,
+    configurar_log,
+)
+
 
 import requests
+import logging
 
-BRONZE = Path("dados/bronze/nvd")
+
 URL_BASE = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-"
-ANOS = [2024, 2025, 2026]
+log = logging.getLogger(__name__)
+
 
 
 def baixar(ano: int):
-    print(f"Baixando feed NVD {ano}...")
+
+    log.info("Baixando feed NVD %s...", ano)
     url = f"{URL_BASE}{ano}.json.gz"
 
     resposta = requests.get(url, timeout=60)
@@ -32,7 +41,9 @@ def salvar(ano: int, dados):
     with destino.open("wb") as arquivo:
         arquivo.write(dados)
 
-    print(f"Arquivo salvo em: {destino}")
+
+    log.info("Arquivo salvo em: %s", destino)
+
 
     return destino
 
@@ -58,4 +69,5 @@ def main():
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()

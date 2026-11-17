@@ -1,14 +1,18 @@
 import json
-from pathlib import Path
+import logging
+
+from config import (
+    BRONZE_NVD as BRONZE,
+    PRATA,
+    ANOS_NVD as ANOS,
+    configurar_log,
+)
+
 
 import pandas as pd
 
 import limpeza
 import utils
-
-BRONZE = Path("dados/bronze/nvd")
-PRATA = Path("dados/prata")
-ANOS = [2024, 2025, 2026]
 
 STATUS_ESPERADOS = {
     "Received",
@@ -28,7 +32,7 @@ ORDEM_CVSS = (
 )
 
 FONTE_NVD = "nvd@nist.gov"
-
+log = logging.getLogger(__name__)
 
 def descricao_en(cve: dict):
     for d in cve.get("descriptions", []):
@@ -180,13 +184,28 @@ def carregar():
                 }
             )
 
+
     df = pd.DataFrame(registros)
 
-    print("lido:", ", ".join(origens), df.shape)
-    print(df.columns.tolist())
-    print(df.isna().sum())
+    log.info(
+        "NVD carregada: arquivos=%s; linhas=%s; colunas=%s",
+        ", ".join(origens),
+        len(df),
+        len(df.columns),
+    )
+
+    log.debug(
+        "Colunas da NVD: %s",
+        df.columns.tolist(),
+    )
+
+    log.info(
+        "Valores ausentes por coluna na NVD: %s",
+        df.isna().sum().to_dict(),
+    )
 
     return df, origens
+
 
 
 def diagnosticar_ausentes_por_status(df):
@@ -194,9 +213,16 @@ def diagnosticar_ausentes_por_status(df):
     sem_score = df[df["baseScore"].isna()]
     contagem = sem_score["vulnStatus"].value_counts()
 
-    print("\nCVEs sem baseScore, por vulnStatus:")
-    print(contagem)
-    print(f"Total sem baseScore: {len(sem_score)}\n")
+
+    log.info(
+        "CVEs sem baseScore, por vulnStatus: %s",
+        contagem.to_dict(),
+    )
+
+    log.info(
+        "Total sem baseScore: %s",
+        len(sem_score),
+    )
 
     return contagem.to_dict()
 
@@ -209,10 +235,14 @@ def conferir_vulnstatus(df):
         - STATUS_ESPERADOS
     )
 
-    print(
-        "valores nao previstos em vulnStatus:",
-        inesperados or "nenhum",
+    if inesperados:
+        log.warning(
+            "Valores nao previstos em vulnStatus: %s",
+        inesperados,
     )
+
+    else:
+        log.info("Valores nao previstos em vulnStatus: nenhum")
 
     return inesperados
 
@@ -223,7 +253,9 @@ def tratar_rejeitados(df):
     rejeitados = df["vulnStatus"] == "Rejected"
     quantidade = int(rejeitados.sum())
 
-    print("rejeitados removidos:", quantidade)
+
+    log.info("CVEs Rejected removidos: %s", quantidade)
+
 
     return df.loc[~rejeitados].copy(), quantidade
 
@@ -234,8 +266,8 @@ def sinalizar_sem_cvss(df):
     df["sem_pontuacao_cvss"] = df["baseScore"].isna()
     quantidade = int(df["sem_pontuacao_cvss"].sum())
 
-    print(
-        "sem pontuacao CVSS (mantidos e sinalizados):",
+    log.info(
+        "CVEs sem pontuacao CVSS (mantidos e sinalizados): %s",
         quantidade,
     )
 
@@ -265,12 +297,13 @@ def derivar_vetor_ataque_rede(df):
         df["vetor_ataque_rede"].isna().sum()
     )
 
-    print(
-        "CVEs com vetor de ataque Network (AV:N):",
-        quantidade_rede,
-    )
-    print(
-        "CVEs sem vetor CVSS utilizavel para derivar a flag:",
+    log.info(
+    "CVEs com vetor de ataque Network (AV:N): %s",
+    quantidade_rede,
+)
+
+    log.info(
+        "CVEs sem vetor CVSS utilizavel para derivar a flag: %s",
         quantidade_sem_vetor,
     )
 
@@ -291,17 +324,18 @@ def marcar_extremos_referencias(df):
 
     quantidade = int(df["num_referencias_extremo"].sum())
 
-    print(
-        "num_referencias extremos sinalizados pelo IQR:",
-        quantidade,
-    )
+    log.info(
+    "Extremos de num_referencias sinalizados pelo IQR: %s",
+    quantidade,
+)
 
     return df, quantidade
 
 
+
 def converter_tipos(df):
-        # Converte published e lastModified para datetime,
-        # identifica falhas de conversao e remove apenas essas linhas.
+    # Converte published e lastModified para datetime,
+    # identifica falhas de conversao e remove apenas essas linhas.
     novos_ausentes = {}
     falhas_conversao = pd.Series(False, index=df.index)
 
@@ -323,27 +357,32 @@ def converter_tipos(df):
         novos_ausentes[coluna] = novos
         falhas_conversao |= falhas_coluna
 
-        print(
-            f"{coluna}: novos ausentes apos conversao de data:",
+        log.info(
+            "%s: novos ausentes apos conversao de data: %s",
+            coluna,
             novos,
         )
 
     removidas_conversao = int(falhas_conversao.sum())
 
     if removidas_conversao:
-        print(
-            "linhas removidas por falha de conversao de data:",
+        log.warning(
+            "Linhas removidas por falha de conversao de data: %s",
             removidas_conversao,
         )
-        print(
+
+        log.warning(
+            "Exemplos de CVEs com falha de conversao: %s",
             df.loc[
-                falhas_conversao,
-                ["id", "published", "lastModified"],
-            ]
+                falhas_conversao, "id"
+            ].head(5).tolist(),
         )
+
         df = df.loc[~falhas_conversao].copy()
 
     return df, novos_ausentes, removidas_conversao
+
+
 
 
 def salvar(df):
@@ -352,9 +391,15 @@ def salvar(df):
     destino = PRATA / "nvd.parquet"
     df.to_parquet(destino, index=False)
 
-    print("salvo em:", destino, df.shape)
+    log.info(
+        "NVD salva em: %s; linhas=%s; colunas=%s",
+        destino,
+        len(df),
+        len(df.columns),
+    )
 
     return destino
+
 
 
 def main():
@@ -487,4 +532,5 @@ def main():
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()

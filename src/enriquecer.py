@@ -1,12 +1,11 @@
-"""Aula 7: enriquecimento da NVD com EPSS e CISA KEV na Prata."""
-
-from pathlib import Path
+import logging
 
 import pandas as pd
 
+from config import PRATA, configurar_log
 import utils
 
-PRATA = Path("dados/prata")
+log = logging.getLogger(__name__)
 
 
 def carregar():
@@ -26,12 +25,17 @@ def carregar():
     epss = pd.read_parquet(caminhos["EPSS"])
     kev = pd.read_parquet(caminhos["CISA KEV"])
 
+
     for nome, df in [
         ("NVD", nvd),
         ("EPSS", epss),
         ("CISA KEV", kev),
     ]:
-        print(f"{nome} carregada: {len(df)} linhas")
+        log.info(
+            "%s carregada: %s linhas",
+            nome,
+            len(df),
+        )
 
         if df.empty:
             raise ValueError(f"A tabela da fonte {nome} esta vazia")
@@ -55,11 +59,15 @@ def conferir_chave(df, nome, chave, colunas):
 
     duplicadas = int(df[chave].duplicated().sum())
 
-    print(
-        f"{nome}: chave={chave}; "
-        f"vazias={int(ausentes.sum())}; "
-        f"duplicadas={duplicadas}"
+
+    log.info(
+        "%s: chave=%s; vazias=%s; duplicadas=%s",
+        nome,
+        chave,
+        int(ausentes.sum()),
+        duplicadas,
     )
+
 
     if ausentes.any() or duplicadas:
         raise ValueError(f"{nome}: corrija as chaves invalidas antes da juncao")
@@ -71,21 +79,21 @@ def conferir_correspondencias(nvd, epss, kev):
     ids_epss = set(epss["cve"])
     ids_kev = set(kev["cveID"])
 
-    print("\nNVD x EPSS (antes da juncao)")
-    print("so na NVD:", len(ids_nvd - ids_epss))
-    print("so no EPSS:", len(ids_epss - ids_nvd))
-    print("nos dois:", len(ids_nvd & ids_epss))
-    print(
-        "exemplos so no EPSS:",
+    log.info("NVD x EPSS (antes da juncao)")
+    log.info("So na NVD: %s", len(ids_nvd - ids_epss))
+    log.info("So no EPSS: %s", len(ids_epss - ids_nvd))
+    log.info("Nos dois: %s", len(ids_nvd & ids_epss))
+    log.info(
+        "Exemplos so no EPSS: %s",
         sorted(ids_epss - ids_nvd)[:5],
     )
 
-    print("\nNVD x KEV (antes da juncao)")
-    print("so na NVD:", len(ids_nvd - ids_kev))
-    print("so no KEV:", len(ids_kev - ids_nvd))
-    print("nos dois:", len(ids_nvd & ids_kev))
-    print(
-        "exemplos so no KEV:",
+    log.info("NVD x KEV (antes da juncao)")
+    log.info("So na NVD: %s", len(ids_nvd - ids_kev))
+    log.info("So no KEV: %s", len(ids_kev - ids_nvd))
+    log.info("Nos dois: %s", len(ids_nvd & ids_kev))
+    log.info(
+        "Exemplos so no KEV: %s",
         sorted(ids_kev - ids_nvd)[:5],
     )
 
@@ -157,9 +165,9 @@ def derivar_atributo(resultado):
 
 
 def validar(nvd, resultado):
-    print("\nVALIDACAO DO ENRIQUECIMENTO")
-    print("NVD antes:", len(nvd))
-    print("resultado:", len(resultado))
+    log.info("VALIDACAO DO ENRIQUECIMENTO")
+    log.info("NVD antes: %s", len(nvd))
+    log.info("Resultado: %s", len(resultado))
 
     if len(resultado) != len(nvd) or resultado["id"].duplicated().any():
         raise ValueError("A juncao alterou a quantidade ou a unicidade das CVEs")
@@ -174,37 +182,22 @@ def validar(nvd, resultado):
 
     atributo_ausente = int(resultado["cvss_alto_epss_top10"].isna().sum())
 
-    print(
-        "NVD sem correspondencia no EPSS:",
-        sem_epss,
-    )
-    print(
-        "NVD com correspondencia no KEV:",
-        com_kev,
-    )
-    print(
-        "NVD sem correspondencia no KEV:",
-        sem_kev,
-    )
+    log.info("NVD sem correspondencia no EPSS: %s", sem_epss)
+    log.info("NVD com correspondencia no KEV: %s", com_kev)
+    log.info("NVD sem correspondencia no KEV: %s", sem_kev)
 
-    print(
-        "exemplos sem EPSS:",
+    log.info(
+        "Exemplos sem EPSS: %s",
         resultado.loc[~resultado["tem_epss"], "id"].head(5).tolist(),
     )
 
-    print(
-        "exemplos sem KEV:",
+    log.info(
+        "Exemplos sem KEV: %s",
         resultado.loc[~resultado["consta_kev"], "id"].head(5).tolist(),
     )
 
-    print(
-        "cvss_alto_epss_top10=True:",
-        atributo_verdadeiro,
-    )
-    print(
-        "cvss_alto_epss_top10 ausente:",
-        atributo_ausente,
-    )
+    log.info("cvss_alto_epss_top10=True: %s", atributo_verdadeiro)
+    log.info("cvss_alto_epss_top10 ausente: %s", atributo_ausente)
 
     return (
         sem_epss,
@@ -220,7 +213,12 @@ def salvar(resultado):
 
     resultado.to_parquet(destino, index=False)
 
-    print("salvo em:", destino, resultado.shape)
+    log.info(
+        "Enriquecimento salvo em: %s; linhas=%s; colunas=%s",
+        destino,
+        len(resultado),
+        len(resultado.columns),
+    )
 
     return destino
 
@@ -311,4 +309,5 @@ def main():
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()

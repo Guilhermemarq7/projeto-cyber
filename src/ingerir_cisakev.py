@@ -1,15 +1,17 @@
 import json
 from datetime import datetime, timezone
-from pathlib import Path
+from config import BRONZE_CISA_KEV as BRONZE, configurar_log
+
 
 import requests
+import logging
 
-BRONZE = Path("dados/bronze/cisa_kev")
 URL = "https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv"
+log = logging.getLogger(__name__)
 
 
 def baixar():
-    print("Baixando catálogo CISA KEV...")
+    log.info("Baixando catalogo CISA KEV...")
     resposta = requests.get(URL, timeout=60)
     resposta.raise_for_status()
 
@@ -27,7 +29,7 @@ def salvar(dados):
     with destino.open("wb") as arquivo:
         arquivo.write(dados)
 
-    print(f"Arquivo salvo em: {destino}")
+    log.info("Arquivo salvo em: %s", destino)
 
     return destino
 
@@ -51,5 +53,7 @@ def main():
     registrar(destino)
 
 
+
 if __name__ == "__main__":
+    configurar_log()
     main()

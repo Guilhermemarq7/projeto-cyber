@@ -1,22 +1,30 @@
 import json
+import logging
 from pathlib import Path
 
 import pandas as pd
 from data_profiling import ProfileReport
 
 import utils
+from config import (
+    RELATORIOS,
+    BRONZE_CISA_KEV,
+    BRONZE_EPSS,
+    BRONZE_NVD,
+    ANOS_NVD,
+    configurar_log,
+)
 
-RELATORIOS = Path("relatorios")
+log = logging.getLogger(__name__)
 
 FONTES_CSV = [
-    (Path("dados/bronze/cisa_kev"), "cisa_kev_*.csv"),
-    (Path("dados/bronze/epss"), "epss_*.csv"),
+    (BRONZE_CISA_KEV, "cisa_kev_*.csv"),
+    (BRONZE_EPSS, "epss_*.csv"),
 ]
 
 FONTES_NVD = [
-    (Path("dados/bronze/nvd"), "nvd_2024_*.json"),
-    (Path("dados/bronze/nvd"), "nvd_2025_*.json"),
-    (Path("dados/bronze/nvd"), "nvd_2026_*.json"),
+    (BRONZE_NVD, f"nvd_{ano}_*.json")
+    for ano in ANOS_NVD
 ]
 
 ORDEM_CVSS = (
@@ -198,14 +206,13 @@ def main():
     for pasta, padrao in FONTES_CSV + FONTES_NVD:
         caminho = utils.mais_recente(pasta, padrao)
 
-        print(f"Perfilando: {caminho.name}")
+        log.info("Perfilando: %s", caminho.name)
 
         arquivo_relatorio = gerar(caminho)
 
-        print(
-            f"Relatório gerado em: {arquivo_relatorio}\n"
-        )
+        log.info("Relatorio gerado em: %s", arquivo_relatorio)
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()

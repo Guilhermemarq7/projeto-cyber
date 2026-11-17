@@ -1,29 +1,46 @@
-from pathlib import Path
+import logging
+
+from config import BRONZE_EPSS as BRONZE, PRATA, configurar_log
 
 import pandas as pd
 
 import limpeza
 import utils
 
-BRONZE = Path("dados/bronze/epss")
-PRATA = Path("dados/prata")
 PADRAO = "epss_*.csv"
+log = logging.getLogger(__name__)
 
 
 def carregar():
     caminho = utils.mais_recente(BRONZE, PADRAO)
     df = pd.read_csv(caminho, comment="#")
 
-    print("lido:", caminho.name, df.shape)
-    print(df.columns.tolist())
-    print(df.isna().sum())
+
+    log.info(
+        "EPSS carregado: arquivo=%s; linhas=%s; colunas=%s",
+        caminho.name,
+        len(df),
+        len(df.columns),
+    )
+
+    log.debug(
+        "Colunas do EPSS: %s",
+        df.columns.tolist(),
+    )
+
+    log.info(
+        "Valores ausentes por coluna no EPSS: %s",
+        df.isna().sum().to_dict(),
+    )
+
 
     return df, caminho
 
 
+
 def converter_tipos(df):
-        # Converte epss e percentile para numerico,
-        # identifica falhas de conversao e remove essas linhas.
+    # Converte epss e percentile para numerico,
+    # identifica falhas de conversao e remove essas linhas.
     novos_ausentes = {}
     falhas_conversao = pd.Series(False, index=df.index)
 
@@ -44,22 +61,32 @@ def converter_tipos(df):
         novos_ausentes[coluna] = novos
         falhas_conversao |= falhas_coluna
 
-        print(
-            f"{coluna}: novos ausentes apos conversao numerica:",
+        log.info(
+            "%s: novos ausentes apos conversao numerica: %s",
+            coluna,
             novos,
         )
 
     removidas_conversao = int(falhas_conversao.sum())
 
     if removidas_conversao:
-        print(
-            "linhas removidas por falha de conversao numerica:",
+        log.warning(
+            "Linhas removidas por falha de conversao numerica: %s",
             removidas_conversao,
         )
-        print(df.loc[falhas_conversao])
+
+        log.warning(
+            "Exemplos de CVEs com falha de conversao: %s",
+            df.loc[
+                falhas_conversao, "cve"
+            ].head(5).tolist(),
+        )
+
         df = df.loc[~falhas_conversao].copy()
 
     return df, novos_ausentes, removidas_conversao
+
+
 
 
 def salvar(df):
@@ -68,9 +95,15 @@ def salvar(df):
     destino = PRATA / "epss.parquet"
     df.to_parquet(destino, index=False)
 
-    print("salvo em:", destino, df.shape)
+    log.info(
+        "EPSS salvo em: %s; linhas=%s; colunas=%s",
+        destino,
+        len(df),
+        len(df.columns),
+    )
 
     return destino
+
 
 
 def main():
@@ -148,4 +181,5 @@ def main():
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()

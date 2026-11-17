@@ -3,14 +3,18 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from config import BRONZE_EPSS as BRONZE, configurar_log
+
+
+import logging
 import requests
 
-BRONZE = Path("dados/bronze/epss")
 URL = "https://epss.cyentia.com/epss_scores-current.csv.gz"
+log = logging.getLogger(__name__)
 
 
 def baixar():
-    print("Baixando arquivo diário do EPSS...")
+    log.info("Baixando arquivo diario do EPSS...")
     resposta = requests.get(URL, timeout=60)
     resposta.raise_for_status()
 
@@ -29,7 +33,7 @@ def salvar(dados):
     with destino.open("wb") as arquivo:
         arquivo.write(dados)
 
-    print(f"Arquivo salvo em: {destino}")
+    log.info("Arquivo salvo em: %s", destino)
 
     return destino
 
@@ -54,4 +58,5 @@ def main():
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()

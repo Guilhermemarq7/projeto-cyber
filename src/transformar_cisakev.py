@@ -1,29 +1,45 @@
-from pathlib import Path
+import logging
+from config import BRONZE_CISA_KEV as BRONZE, PRATA, configurar_log
 
 import pandas as pd
 
 import limpeza
 import utils
 
-BRONZE = Path("dados/bronze/cisa_kev")
-PRATA = Path("dados/prata")
 PADRAO = "cisa_kev_*.csv"
+log = logging.getLogger(__name__)
 
 
 def carregar():
     caminho = utils.mais_recente(BRONZE, PADRAO)
     df = pd.read_csv(caminho)
 
-    print("lido:", caminho.name, df.shape)
-    print(df.columns.tolist())
-    print(df.isna().sum())
+
+    log.info(
+        "CISA KEV carregado: arquivo=%s; linhas=%s; colunas=%s",
+        caminho.name,
+        len(df),
+        len(df.columns),
+    )
+
+    log.debug(
+        "Colunas do CISA KEV: %s",
+        df.columns.tolist(),
+    )
+
+    log.info(
+        "Valores ausentes por coluna no CISA KEV: %s",
+        df.isna().sum().to_dict(),
+    )
+
 
     return df, caminho
 
 
+
 def converter_tipos(df):
-        # Converte dateAdded e dueDate para datetime e conta
-        # quantos novos valores ausentes surgiram na conversao.
+    # Converte dateAdded e dueDate para datetime e conta
+    # quantos novos valores ausentes surgiram na conversao.
     novos_ausentes = {}
 
     for coluna in ["dateAdded", "dueDate"]:
@@ -40,12 +56,15 @@ def converter_tipos(df):
 
         novos_ausentes[coluna] = novos
 
-        print(
-            f"{coluna}: novos ausentes apos conversao de data:",
+        log.info(
+            "%s: novos ausentes apos conversao de data: %s",
+            coluna,
             novos,
         )
 
     return df, novos_ausentes
+
+
 
 
 def salvar(df):
@@ -54,9 +73,15 @@ def salvar(df):
     destino = PRATA / "cisa_kev.parquet"
     df.to_parquet(destino, index=False)
 
-    print("salvo em:", destino, df.shape)
+    log.info(
+        "CISA KEV salvo em: %s; linhas=%s; colunas=%s",
+        destino,
+        len(df),
+        len(df.columns),
+    )
 
     return destino
+
 
 
 def main():
@@ -120,4 +145,5 @@ def main():
 
 
 if __name__ == "__main__":
+    configurar_log()
     main()
