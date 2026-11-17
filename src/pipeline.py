@@ -1,4 +1,4 @@
-"""Aula 8: execucao sequencial das etapas do Projeto Cyber."""
+"""Aula 8/9: execucao sequencial das etapas do Projeto Cyber."""
 
 import logging
 import sys
@@ -30,12 +30,18 @@ def transformar_todas():
     transformar_cisakev.main()
 
 
-# As etapas futuras aparecem explicitamente, mas ainda nao sao executadas.
+def etapa_carga():
+    """Importa apenas quando a etapa for executada."""
+    import carga
+
+    carga.main()
+
+
 ETAPAS = [
     ("ingestao", ingerir_todas),
     ("transformacao", transformar_todas),
     ("enriquecimento", enriquecer.main),
-    ("carga", None),
+    ("carga", etapa_carga),
     ("modelagem", None),
 ]
 
