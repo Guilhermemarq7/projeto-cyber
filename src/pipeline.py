@@ -1,10 +1,11 @@
-"""Aula 8/9: execucao sequencial das etapas do Projeto Cyber."""
+"""Aulas 8-10: execucao sequencial das etapas do Projeto Cyber."""
 
 import logging
+import subprocess
 import sys
 from time import perf_counter
 
-from config import configurar_log
+from config import RAIZ, configurar_log
 import enriquecer
 import ingerir_cisakev
 import ingerir_epss
@@ -37,12 +38,34 @@ def etapa_carga():
     carga.main()
 
 
+def etapa_modelagem():
+    """Executa os modelos dbt e valida a Ouro resultante."""
+    import carga
+
+    projeto_dbt = RAIZ / "ecox14"
+    if not (projeto_dbt / "dbt_project.yml").is_file():
+        raise FileNotFoundError(f"Projeto dbt nao encontrado: {projeto_dbt}")
+
+    # A view antiga depende das tabelas que o dbt vai substituir.
+    # Fechamos esta conexao antes de executar dbt (DuckDB bloqueia multiplos escritores).
+    carga.preparar_modelagem()
+
+    subprocess.run(
+        ["dbt", "run", "--project-dir", str(projeto_dbt),
+         "--profiles-dir", str(projeto_dbt)],
+        cwd=projeto_dbt,
+        check=True,
+    )
+
+    carga.validar_ouro()
+
+
 ETAPAS = [
     ("ingestao", ingerir_todas),
     ("transformacao", transformar_todas),
     ("enriquecimento", enriquecer.main),
     ("carga", etapa_carga),
-    ("modelagem", None),
+    ("modelagem", etapa_modelagem),
 ]
 
 

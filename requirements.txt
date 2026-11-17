@@ -4,3 +4,5 @@ fg-data-profiling
 setuptools<82
 pyarrow
 duckdb
+dbt-core
+dbt-duckdb

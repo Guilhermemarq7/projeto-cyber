@@ -1,0 +1,10 @@
+# Perfil local do projeto: o caminho e relativo a este arquivo.
+# Nao contem credenciais; o DuckDB e um banco local.
+ecox14:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../dados/ouro/projeto.duckdb
+      schema: ouro
+      threads: 2

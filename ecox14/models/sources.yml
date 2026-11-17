@@ -1,0 +1,7 @@
+version: 2
+
+sources:
+  - name: prata
+    schema: prata
+    tables:
+      - name: vulnerabilidades_enriquecidas

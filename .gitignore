@@ -66,3 +66,9 @@ venv/
 
 # Logs de execucao
 /pipeline.log
+
+# Arquivos gerados automaticamente pelo dbt
+ecox14/target/
+ecox14/logs/
+ecox14/dbt_packages/
+/ecox14/.user.yml

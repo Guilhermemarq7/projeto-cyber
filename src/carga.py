@@ -1,4 +1,4 @@
-"""Aula 9: carrega a Prata no DuckDB e constroi o modelo da Ouro."""
+"""Aulas 9/10: carrega a Prata; dbt constroi a Ouro."""
 
 import logging
 
@@ -185,6 +185,28 @@ def conferir(con):
     log.info("Conferencias da camada Ouro aprovadas")
 
 
+def preparar_modelagem():
+    """Libera a view anterior para recriar as tabelas pelo dbt.
+
+    A view depende da dimensao e da fato. Recriamos a view pelo dbt,
+    depois das tabelas, sem deixar a conexao aberta.
+    """
+    con = duckdb.connect(str(BANCO))
+    try:
+        con.execute("DROP VIEW IF EXISTS ouro.vw_vulnerabilidades_completas")
+    finally:
+        con.close()
+
+
+def validar_ouro():
+    """Reabre o banco apos o dbt e verifica o modelo resultante."""
+    con = duckdb.connect(str(BANCO), read_only=True)
+    try:
+        conferir(con)
+    finally:
+        con.close()
+
+
 def main():
     OURO.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(BANCO))
@@ -193,8 +215,8 @@ def main():
         con.execute("BEGIN TRANSACTION")
         criar_esquemas(con)
         carregar_prata(con)
-        construir_ouro(con)
-        conferir(con)
+        # construir_ouro(con)  # Aula 10: agora executada pelo dbt.
+        # conferir(con)       # Verificacao apos dbt, em validar_ouro().
         con.execute("COMMIT")
     except Exception:
         con.execute("ROLLBACK")
@@ -202,7 +224,7 @@ def main():
     finally:
         con.close()
 
-    log.info("Banco DuckDB atualizado em: %s", BANCO)
+    log.info("Tabelas da Prata atualizadas no DuckDB: %s", BANCO)
 
 
 if __name__ == "__main__":
