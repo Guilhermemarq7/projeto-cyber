@@ -1,151 +1,168 @@
-# projeto-cyber
+# Projeto Cyber
 
-Pipeline de engenharia de dados sobre NVD, EPSS e CISA KEV, desenvolvido na disciplina Engenharia de Dados na Prática, da professora Bárbara Pimenta Caetano. Este repositório cobre as aulas 1 a 6, até Limpeza e Atributos Derivados (17/09/2026), usando a arquitetura medalhão.
+Projeto acadêmico de **Engenharia de Dados na Prática** (ECOX14/UNIFEI), ministrada pela professora Bárbara Pimenta Caetano. Integra três fontes públicas de vulnerabilidades de segurança da informação em uma arquitetura medalhão (aulas 1 a 11).
 
-O tema é o cruzamento de bases públicas de vulnerabilidades para analisar a relação entre gravidade técnica, probabilidade de exploração e exploração real. A pergunta norteadora apresentada na entrega do tema é:
+## Objetivo
 
-> É possível antecipar quais vulnerabilidades têm maior chance de serem efetivamente exploradas (indicadas pelo CISA KEV) a partir da gravidade técnica (CVSS, no NVD) e da probabilidade de exploração estimada (EPSS)?
+**Pergunta norteadora:** O EPSS oferece informações complementares ao CVSS na priorização de vulnerabilidades, considerando os casos de exploração conhecida registrados no catálogo CISA KEV?
 
-A Bronze e a Prata preparam os dados para essa análise. Ainda não há cruzamento entre as fontes, modelo preditivo ou resultado demonstrado sobre essa relação.
+A pergunta foi refinada após a exploração dos dados. O estudo é descritivo, não preditivo.
 
 ## Fontes de dados
 
-As três fontes são públicas e abertas. O identificador CVE será a chave de ligação entre elas.
-
-| Fonte e papel | Finalidade | Origem → Bronze | Chave |
+| Fonte | Finalidade | Formato na Bronze | Chave |
 |---|---|---|---|
-| NVD — primária | Gravidade técnica e informações das CVEs | `.json.gz` → JSON descompactado | `id` |
-| EPSS — secundária | Probabilidade estimada de exploração | `.csv.gz` → CSV descompactado | `cve` |
-| CISA KEV — secundária | Vulnerabilidades com exploração conhecida | CSV → CSV | `cveID` |
+| [NVD — National Vulnerability Database](https://nvd.nist.gov/vuln/data-feeds) (principal) | Informações das vulnerabilidades e severidade técnica CVSS (0 a 10) | JSON | `id` |
+| [EPSS — Exploit Prediction Scoring System](https://www.first.org/epss/) | Probabilidade estimada de exploração nos próximos 30 dias e percentil | CSV | `cve` |
+| [CISA KEV — Known Exploited Vulnerabilities Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Vulnerabilidades com evidências de exploração conhecida | CSV | `cveID` |
 
-- **NVD:** [catálogo de feeds](https://nvd.nist.gov/vuln/data-feeds); feeds de [2024](https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz), [2025](https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.json.gz) e [2026](https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2026.json.gz). O recorte é pelo ano do identificador CVE, não necessariamente pelo ano de publicação, e não abrange toda a base histórica.
-- **EPSS:** [CSV diário](https://epss.cyentia.com/epss_scores-current.csv.gz) e [documentação](https://www.first.org/epss).
-- **CISA KEV:** [CSV](https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv) e [catálogo](https://www.cisa.gov/known-exploited-vulnerabilities-catalog).
+A NVD utiliza os feeds de [2024](https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz), [2025](https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.json.gz) e [2026](https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2026.json.gz) (ano do identificador CVE, não necessariamente de publicação). Downloads das fontes secundárias: [EPSS](https://epss.cyentia.com/epss_scores-current.csv.gz) e [KEV](https://www.cisa.gov/sites/default/files/csv/known_exploited_vulnerabilities.csv).
 
-CVSS, EPSS e presença no KEV representam conceitos distintos: gravidade técnica, probabilidade estimada e exploração conhecida, respectivamente.
+## Arquitetura
 
-## Arquitetura e execução
+```mermaid
+flowchart LR
+    A[Fontes públicas] --> B[Bronze: JSON e CSV]
+    B --> C[Prata: limpeza e integração em Parquet]
+    C --> D[DuckDB: esquema prata]
+    D --> E[dbt: esquema ouro]
+    E --> F[Streamlit]
+```
 
-- `dados/bronze/`: arquivos por fonte (`nvd`, `epss`, `cisa_kev`), sem limpeza dos registros, e proveniência da ingestão.
-- `dados/prata/`: resultados da limpeza, validações, conversão de tipos e atributos derivados em Parquet, com proveniência. A exploração da Bronze orienta esses tratamentos.
-- `dados/ouro/`: reservado para uma etapa posterior; ainda não implementada.
-- `src/`: scripts de ingestão, exploração e transformação. `limpeza.py` reúne funções genéricas de limpeza; `utils.py`, seleção de arquivos e registro de proveniência.
-- `relatorios/`: HTMLs gerados pelo profiling. Dados e relatórios ficam fora do Git; os arquivos `proveniencia.jsonl` são versionados.
+- `dados/bronze/`: ingestão HTTP, arquivos datados sem limpeza e proveniência.
+- `dados/prata/`: limpeza, atributos derivados e integração em quatro arquivos Parquet.
+- `dados/ouro/`: banco DuckDB com esquema `prata` (carga) e `ouro` (modelos dbt).
+- `dashboard/`: Streamlit, somente leitura, com indicadores, gráficos, filtros e tabela.
 
-Execute os comandos **na raiz do repositório**. O ambiente foi instalado com Python 3.12; as dependências estão em [requirements.txt](requirements.txt): pandas, requests, fg-data-profiling, setuptools<82 e pyarrow.
+Ferramentas: Python, pandas, requests, fg-data-profiling, PyArrow, DuckDB, dbt e Streamlit. Configuração em `src/config.py`; orquestração em `src/pipeline.py`.
 
-```bash
+## Tratamento e integração
+
+O profiling (`src/explorar.py`) gera cinco HTMLs em `relatorios/`. A exploração dos arquivos de 15/10/2026 revelou chaves únicas, CVSS ausente, referências assimétricas, EPSS sem nulos e ausências em `cwes` do KEV.
+
+- **NVD:** concatena os três anos, remove `Rejected`, converte datas para UTC e valida CVSS em [0, 10], preservando ausentes. A política local prefere métricas v4.0, v3.1, v3.0 e v2, nessa ordem; depois `Primary` e fonte NVD, com desempate determinístico. Preserva os metadados da métrica escolhida.
+- **EPSS:** converte probabilidade e percentil para número; remove falhas de conversão de valores preenchidos e valores fora de [0, 1]. Mantém extremos válidos.
+- **CISA KEV:** converte datas, verifica a ordem entre inclusão e prazo de remediação e preserva `Unknown` em ransomware.
+
+As três transformações removem espaços nas bordas dos textos e nomes das colunas, conferem chaves e, se houver duplicatas, mantêm a primeira ocorrência com registro da remoção.
+
+### Atributos derivados
+
+| Atributo na Prata | Significado |
+|---|---|
+| `sem_pontuacao_cvss` | Sinaliza a ausência de pontuação CVSS, sem imputar valores. |
+| `vetor_ataque_rede` | Identifica `AV:N` no vetor CVSS; nulo quando não há vetor. |
+| `num_referencias_extremo` | Sinaliza extremos pelo critério de 1,5 × IQR, sem removê-los. O IQR foi preferido ao z-score pela distribuição assimétrica das referências. |
+| `cvss_selecao_ambigua` | Indica mais de uma métrica candidata após as preferências da política local. |
+| `tem_epss` e `consta_kev` | Indicam correspondência com as fontes secundárias. |
+| `cvss_alto_epss_top10` | Combina severidade `HIGH` ou `CRITICAL` com percentil EPSS ≥ 0,90; nulo se faltar severidade ou percentil. Permite avaliar a seleção conjunta. |
+
+`src/enriquecer.py` confere as chaves e integra EPSS e KEV à NVD por duas junções `left`, com `validate="one_to_one"`. Preserva quantidade e unicidade da NVD, sem preencher EPSS ausente com zero.
+
+## Modelagem e qualidade da Ouro
+
+Banco: `dados/ouro/projeto.duckdb`. Grão da dimensão, fato e view: **uma linha por CVE da NVD no recorte**, sem histórico por vulnerabilidade.
+
+| Modelo | Conteúdo |
+|---|---|
+| `ouro.dim_cve` | Atributos descritivos, severidade e metadados CVSS. |
+| `ouro.fato_risco_cve` | Pontuação CVSS, EPSS, presença no KEV e demais indicadores. |
+| `ouro.vw_vulnerabilidades_completas` | View que relaciona dimensão e fato pela chave `cve_id` (1:1). |
+
+A carga é transacional. O dbt usa `source()` e `ref()` e executa seis testes: `unique` e `not_null` nas duas chaves, `relationships` e consistência da flag combinada. O Python confere também chaves vazias, órfãos e preservação das contagens e indicadores. Falhas interrompem o pipeline, com registro no terminal e no `pipeline.log`.
+
+## Execução
+
+Execução validada no Windows com Python 3.13.5. Clone o repositório e, na raiz, crie o ambiente virtual e instale as dependências:
+
+```cmd
 python -m venv .venv
-source .venv/bin/activate
+.venv\Scripts\activate.bat
 python -m pip install -r requirements.txt
 ```
 
-No PowerShell, a ativação é `.venv\Scripts\Activate.ps1`.
+No PowerShell, a ativação é `.venv\Scripts\Activate.ps1`; no Linux/macOS, `source .venv/bin/activate`.
+
+### Pipeline
 
 ```bash
-# Ingestão: requer acesso HTTPS às três fontes
-python src/ingerir_nvd.py
-python src/ingerir_epss.py
-python src/ingerir_cisakev.py
-
-# Exploração da Bronze: gera os cinco HTMLs em relatorios/
-python src/explorar.py
-
-# Transformações: geram os três Parquet em dados/prata/
-python src/transformar_nvd.py
-python src/transformar_epss.py
-python src/transformar_cisakev.py
+python src/pipeline.py
 ```
 
-Exploração e transformação selecionam os arquivos mais recentes pelo nome datado, sendo um por ano no caso da NVD. É necessário ter os arquivos Bronze antes dessas etapas; o profiling completo pode ser demorado.
+Requer internet para a ingestão. A ordem é: ingestão → transformação → enriquecimento → carga → modelagem (`dbt run`, `dbt test` e validação da Ouro). Para retomar uma etapa, informe `ingestao`, `transformacao`, `enriquecimento`, `carga` ou `modelagem`, desde que as saídas anteriores existam. Exemplo:
 
-### Ingestão e proveniência
+```bash
+python src/pipeline.py modelagem
+```
 
-A ingestão descompacta NVD e EPSS, preservando o conteúdo dos registros. Os nomes incluem a data de extração `AAAAMMDD`, por exemplo `nvd_2024_20261001.json`. A identificação é diária: repetir a extração no mesmo dia pode substituir o arquivo anterior, decisão mantida para o escopo acadêmico. As transformações também substituem os respectivos Parquet; preserve cópias se precisar conservar resultados anteriores.
+O profiling é opcional na execução do pipeline e roda separadamente após a ingestão:
 
-Cada execução acrescenta um registro JSONL:
+```bash
+python src/explorar.py
+```
 
-- **Bronze:** `fonte`, `arquivo_bronze`, `extraido_em`, em `dados/bronze/<fonte>/proveniencia.jsonl`.
-- **Prata:** `origem`, `arquivo_prata`, `linhas_antes`, `linhas_depois`, `decisoes`, `transformado_em`, em [dados/prata/proveniencia.jsonl](dados/prata/proveniencia.jsonl).
+### Dashboard
 
-O código atual registra os horários de proveniência em UTC. O cabeçalho de metadados do EPSS permanece no CSV Bronze e é ignorado na leitura com `comment="#"`; não é convertido em colunas da Prata. Fonte, arquivo e horário já documentam a ingestão, sem necessidade de ampliar os metadados nesta etapa.
+```bash
+python -m streamlit run dashboard/painel.py
+```
 
-## Exploração automatizada — arquivos de 15/10/2026
+Acesse <http://localhost:8501>. O painel utiliza consultas parametrizadas em `dashboard/consultas.py`, sem modificar o banco. Feche o painel antes de reprocessar os dados para evitar conflitos de acesso ao DuckDB.
 
-Os resultados abaixo foram obtidos dos cinco relatórios HTML de profiling da NVD (2024, 2025 e 2026), EPSS e CISA KEV. Os relatórios foram gerados em **14/11/2026**, com data-profiling 4.20.0, a partir de arquivos identificados com a data de **15/10/2026**.
+### Testes e documentação dbt
 
-Os resultados representam a Bronze antes das transformações da Prata. Os relatórios HTML foram conferidos nesta auditoria, mas os arquivos brutos correspondentes não foram reprocessados.
+Na raiz, com o ambiente virtual ativo e a Ouro já construída:
 
+```bash
+cd ecox14
+dbt test --project-dir . --profiles-dir .
+dbt docs generate --project-dir . --profiles-dir .
+dbt docs serve --project-dir . --profiles-dir .
+```
 
-| Fonte | Registros | Colunas | Células ausentes | Linhas duplicadas |
-|---|---:|---:|---:|---:|
-| NVD 2024 | 39.267 | 17 | 5.708 | 0 |
-| NVD 2025 | 45.364 | 17 | 15.829 | 0 |
-| NVD 2026 | 74.332 | 17 | 26.879 | 0 |
-| EPSS | 389.824 | 3 | 0 | 0 |
-| CISA KEV | 1.745 | 12 | 175 | 0 |
+A documentação fica disponível em <http://localhost:8080>. Execute esses comandos dentro de `ecox14/`, pois o perfil usa o caminho relativo `../dados/ouro/projeto.duckdb`. Encerre o servidor com `Ctrl+C` e retorne à raiz com `cd ..`.
 
-As chaves são únicas nos arquivos perfilados. Células ausentes não equivalem a linhas a remover.
+## Resultados — coleta de 19/11/2026
 
-### Achados relevantes
+Execução validada: três modelos e seis testes dbt aprovados, documentação e filtros do painel conferidos.
 
-**NVD:** `baseScore` está ausente em 795, 2.197 e 3.538 registros de 2024, 2025 e 2026, respectivamente; os totais `Rejected` são 789, 1.787 e 1.007. Como as ausências superam as rejeições nos três anos, existem CVEs de outros status também sem pontuação. A sobreposição exata entre rejeição e ausência de CVSS não foi calculada. `baseScore` e `baseSeverity` têm forte associação, compatível com a classificação de severidade por faixas do score. `num_referencias` tem distribuição assimétrica, e extremos podem ser legítimos. As métricas selecionadas nos relatórios são das famílias v3.0, v3.1 e v4.0.
+| Saída da Prata | Antes | Depois |
+|---|---:|---:|
+| NVD | 178.682 | 174.636 |
+| EPSS | 409.087 | 409.087 |
+| CISA KEV | 1.786 | 1.786 |
+| Vulnerabilidades enriquecidas | 174.636 | 174.636 |
 
-O profiling NVD extrai 17 campos do JSON aninhado. `num_referencias` conta entradas de `references`; `num_fraquezas` conta entradas de `weaknesses`, **não códigos CWE distintos**. A coluna `cwes` reúne valores das descrições em inglês, sem repetições, podendo incluir códigos ou marcadores de informação não especificada. A lista de URLs de referência não é extraída para o DataFrame.
+Foram removidos 4.046 `Rejected`, mantidas 3.382 CVEs sem CVSS e sinalizados 6.175 extremos de referências. Todas as CVEs da NVD tratada encontraram EPSS; 568 constavam no KEV e 174.068 não constavam. Outros 234.451 registros EPSS e 1.218 KEV estavam fora do universo NVD tratado; as fontes secundárias têm cobertura própria e não ampliam o recorte principal.
 
-**EPSS:** sem ausências ou duplicatas; `epss` varia de 0,00049 a 0,99999, e `percentile` fica em [0, 1]. A forte correlação é esperada: o percentil expressa posição relativa ao score. Ambos são mantidos por suas interpretações diferentes.
+### Resposta à pergunta norteadora
 
-**CISA KEV:** as 175 ausências estão em `cwes` (10,0%). `forensicTriage` tem 1.661 valores `False` e 84 `True`; `knownRansomwareCampaignUse`, 1.384 `Unknown` e 361 `Known`. A associação entre `requiredAction` e `forensicTriage` não comprova que sejam intercambiáveis. `cwes` pode reunir vários códigos e `notes`, várias URLs na mesma célula; permanecem textuais nesta etapa. Correlações observadas não demonstram causalidade.
+A análise descritiva das 171.254 CVEs com CVSS e EPSS disponíveis (incluindo as 568 do KEV) produziu os seguintes resultados:
 
-### Histórico preservado — 02/09/2026
-
-O README anterior identificava uma extração de 02/09/2026: 39.233, 45.212 e 52.023 registros NVD (2024–2026), 367.327 EPSS e 1.694 KEV. As ausências de `baseScore` eram 791, 2.192 e 1.918, respectivamente. Já estavam registrados ausência de duplicatas, assimetria nas referências, associação score/severidade e EPSS/percentil, além de 175 ausências em `cwes` do KEV. Esses números preservam o histórico e não representam o profiling de outubro.
-
-## Decisões de tratamento
-
-As três transformações removem espaços nas bordas de nomes de colunas e textos e conferem a chave, mantendo a primeira ocorrência se houver repetição. Não há evidência nos resultados observados que justifique novas regras de conflitos, sinônimos ou normalização de identificadores CVE.
-
-- **NVD:** concatena os três anos e verifica status inesperados. Remove CVEs `Rejected`, por serem registros rejeitados; converte `published` e `lastModified` para datas UTC e remove linhas com falhas de conversão de valores antes preenchidos. Remove `baseScore` fora de [0, 10], mas mantém ausências anteriores e CVEs válidas sem score, sinalizando-as sem imputação arbitrária.
-- **EPSS:** converte `epss` e `percentile` para números e remove falhas de conversão de valores preenchidos ou valores fora de [0, 1]. Ausências anteriores não são classificadas como falhas de conversão. Scores altos dentro da faixa são mantidos, pois são informação relevante.
-- **CISA KEV:** converte `dateAdded` e `dueDate` para datas, conta novos ausentes e verifica prazos anteriores à inclusão, sem remover automaticamente essas linhas. `dateAdded` indica inclusão no catálogo, não primeira exploração; `dueDate` é prazo de remediação. `Unknown` não vira `No`. Não há classificação de BOD por corte de data.
-
-### Seleção CVSS e extremos
-
-A política **local** de seleção CVSS considera métricas com `baseScore` preenchido e prefere v4.0, v3.1, v3.0 e v2, nessa ordem. Dentro da versão, prefere `Primary`, depois a fonte `nvd@nist.gov`; empates restantes são resolvidos deterministicamente. Essa não é uma precedência oficial da NVD e não invalida as outras métricas da origem.
-
-São preservados `cvss_versao_usada`, `cvss_source`, `cvss_type`, `cvss_vector`, `cvss_num_metricas_na_versao` e `cvss_selecao_ambigua`. Scores de versões diferentes requerem controle da versão em futuras comparações.
-
-Na comparação registrada em **30/09/2026**, o IQR sinalizou **5.411** registros, contra **1.653** pelo z-score: **3.758** somente pelo IQR e **0** somente pelo z-score. O IQR foi mantido por usar quartis, ser menos sensível a extremos e ser adequado à distribuição assimétrica de `num_referencias`. O código atual usa somente os limites `Q1 − 1,5 × IQR` e `Q3 + 1,5 × IQR`, sem remover os registros sinalizados. Extremo estatístico não é, por si só, erro de dado.
-
-## Transformações da Prata — execução registrada em 01/10/2026
-
-Os últimos registros de [proveniência da Prata](dados/prata/proveniencia.jsonl) são de **01/10/2026** (18:00:30–18:01:23 UTC). Usam `nvd_2024_20261001.json`, `nvd_2025_20261001.json`, `nvd_2026_20261001.json`, `epss_20261001.csv` e `cisa_kev_20261001.csv`. São resultados históricos confirmados no JSONL, distintos dos HTMLs de arquivos de 15/10; a transformação não foi reexecutada nesta revisão.
-
-| Saída em `dados/prata/` | Linhas antes | Linhas depois | Removidas |
+| Critério | CVEs selecionadas | No KEV | Cobertura dos 568 casos KEV |
 |---|---:|---:|---:|
-| `nvd.parquet` | 150.967 | 147.445 | 3.522 |
-| `epss.parquet` | 381.682 | 381.682 | 0 |
-| `cisa_kev.parquet` | 1.730 | 1.730 | 0 |
+| CVSS alto ou crítico | 84.680 | 501 | 88,20% |
+| Percentil EPSS ≥ 0,90 | 3.329 | 436 | 76,76% |
+| CVSS alto/crítico e percentil EPSS ≥ 0,90 | 2.575 | 396 | 69,72% |
+| CVSS alto/crítico ou percentil EPSS ≥ 0,90 | 85.434 | 541 | 95,25% |
 
-- **NVD:** as 3.522 remoções foram de `Rejected`; zero duplicatas, falhas de conversão de datas ou scores fora da faixa. Foram mantidas 2.751 CVEs sem score; 5.420 extremos foram apenas sinalizados pelo IQR. Houve 110.429 flags de ataque Network e 2.751 vetores ausentes; 25.539 registros tinham múltiplas métricas válidas na versão selecionada e 1.302 exigiram desempate após as preferências.
-- **EPSS:** zero duplicatas, falhas de conversão ou valores fora das faixas; nenhuma remoção.
-- **CISA KEV:** zero duplicatas, novos ausentes na conversão de datas ou casos de `dueDate` anterior a `dateAdded`; nenhuma remoção.
+**Sim.** Das 67 vulnerabilidades presentes no KEV com severidade baixa ou média, 40 (59,7%) têm percentil EPSS ≥ 0,90. O EPSS, portanto, destaca casos conhecidos que não seriam selecionados pelo critério exclusivo de severidade alta ou crítica.
 
-## Atributos derivados e sinalizações
+Com o mesmo limite de 2.575 CVEs, os rankings CVSS e EPSS selecionaram, respectivamente, 64 e 407 casos do KEV (desempate por identificador CVE; máximo possível do CVSS com outros desempates: 178). A regra combinada selecionou 396. Logo, complementaridade não garante que a combinação seja superior.
 
-As funções ficam em [src/transformar_nvd.py](src/transformar_nvd.py).
+Os resultados centrais podem ser conferidos no banco DuckDB com a consulta:
 
-| Atributo | Cálculo e finalidade |
-|---|---|
-| `sem_pontuacao_cvss` | `sinalizar_sem_cvss()` marca a ausência de `baseScore`, preservando e identificando CVEs sem pontuação. |
-| `vetor_ataque_rede` | `derivar_vetor_ataque_rede()` retorna `True` quando encontra o componente `AV:N` no vetor selecionado, `False` quando o texto está presente sem esse componente e ausente quando `cvss_vector` é nulo. |
-| `num_referencias_extremo` | `marcar_extremos_referencias()` sinaliza contagens fora dos limites de 1,5 × IQR; não remove linhas. |
-| `cvss_selecao_ambigua` | `selecionar_metrica_cvss()` marca mais de uma candidata após as preferências, tornando o desempate identificável. |
+```sql
+SELECT severidade_cvss,
+       COUNT(*) AS no_kev,
+       COUNT(*) FILTER (WHERE percentil_epss >= 0.90) AS epss_elevado
+FROM ouro.vw_vulnerabilidades_completas
+WHERE consta_kev IS TRUE
+GROUP BY severidade_cvss;
+```
 
-`vetor_ataque_rede` é uma característica técnica complementar para futuras análises segmentadas da pergunta norteadora. Não repete o score CVSS nem mede probabilidade EPSS ou exploração conhecida pelo KEV. A função verifica o componente no texto presente, sem validar toda a sintaxe do vetor.
+## Limitações e proveniência
 
-## Estado atual e próximas etapas
+A coleta contemporânea não demonstra previsão futura. Ausência no KEV não prova ausência de exploração; `dateAdded` é inclusão no catálogo, não primeiro ataque. O percentil EPSS ≥ 0,90 é um limiar exploratório relativo à distribuição global do EPSS, não 90% de probabilidade nem exatamente 10% do recorte. As versões CVSS diferem, e a priorização real depende do contexto dos ativos.
 
-Ingestão, exploração e transformações individuais estão implementadas. Os registros de proveniência permitem acompanhar decisões e contagens; os Parquet podem ser reconstruídos a partir da Bronze correspondente. Downloads atuais podem ter conteúdo diferente dos snapshots históricos.
-
-A integração por CVE, a análise conjunta e a camada Ouro ficam para as próximas etapas. Será necessário alinhar as datas dos snapshots e distinguir inclusão no KEV de data de exploração antes de avaliar a pergunta sobre antecipação.
+A proveniência da [Bronze](dados/bronze/) e [Prata](dados/prata/proveniencia.jsonl) é versionada em JSONL: origem, horários UTC, contagens e decisões, conforme a etapa. Dados, relatórios e logs ficam fora do Git. Novas coletas podem mudar os resultados; uma repetição no mesmo dia pode substituir arquivos. A transformação seleciona os arquivos mais recentes por fonte e substitui os Parquet. Preserve a Bronze correspondente e alinhe as datas para reproduzir os resultados históricos.
