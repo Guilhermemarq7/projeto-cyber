@@ -10,3 +10,6 @@
 {"fonte": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz", "arquivo_bronze": "nvd_2024_20261116.json", "extraido_em": "2026-11-16T22:42:00+00:00"}
 {"fonte": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.json.gz", "arquivo_bronze": "nvd_2025_20261116.json", "extraido_em": "2026-11-16T22:43:02+00:00"}
 {"fonte": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2026.json.gz", "arquivo_bronze": "nvd_2026_20261116.json", "extraido_em": "2026-11-16T22:43:11+00:00"}
+{"fonte": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2024.json.gz", "arquivo_bronze": "nvd_2024_20261119.json", "extraido_em": "2026-11-19T19:25:04+00:00"}
+{"fonte": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2025.json.gz", "arquivo_bronze": "nvd_2025_20261119.json", "extraido_em": "2026-11-19T19:25:08+00:00"}
+{"fonte": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2026.json.gz", "arquivo_bronze": "nvd_2026_20261119.json", "extraido_em": "2026-11-19T19:25:16+00:00"}

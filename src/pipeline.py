@@ -50,12 +50,15 @@ def etapa_modelagem():
     # Fechamos esta conexao antes de executar dbt (DuckDB bloqueia multiplos escritores).
     carga.preparar_modelagem()
 
-    subprocess.run(
-        ["dbt", "run", "--project-dir", str(projeto_dbt),
-         "--profiles-dir", str(projeto_dbt)],
-        cwd=projeto_dbt,
-        check=True,
-    )
+    # Primeiro cria as tabelas e a view; depois cobra os testes declarados no dbt.
+    # Os dois comandos falham o pipeline se retornarem um codigo diferente de zero.
+    for acao in ("run", "test"):
+        subprocess.run(
+            ["dbt", acao, "--project-dir", str(projeto_dbt),
+             "--profiles-dir", str(projeto_dbt)],
+            cwd=projeto_dbt,
+            check=True,
+        )
 
     carga.validar_ouro()
 

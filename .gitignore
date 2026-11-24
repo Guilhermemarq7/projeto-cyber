@@ -72,3 +72,6 @@ ecox14/target/
 ecox14/logs/
 ecox14/dbt_packages/
 /ecox14/.user.yml
+
+# Executavel local do DuckDB
+/duckdb.exe

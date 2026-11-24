@@ -3,5 +3,13 @@ version: 2
 sources:
   - name: prata
     schema: prata
+    description: >
+      Tabelas da camada Prata carregadas no DuckDB a partir dos arquivos
+      Parquet produzidos pelo pipeline Python.
     tables:
       - name: vulnerabilidades_enriquecidas
+        description: >
+          Uma linha por CVE da NVD no recorte do projeto. Resultado das
+          juncoes left com EPSS e CISA KEV, preservando ausencias e as
+          flags derivadas. Constar no KEV indica presenca no catalogo do
+          snapshot, nao comprova previsao nem data da primeira exploracao.

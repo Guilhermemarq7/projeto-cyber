@@ -1,0 +1,114 @@
+version: 2
+
+models:
+  - name: dim_cve
+    description: >
+      Dimensao descritiva de vulnerabilidades da NVD. O grao e uma linha
+      por identificador CVE do recorte de dados carregado, e nao um historico
+      de alteracoes de uma vulnerabilidade ao longo do tempo.
+    columns:
+      - name: cve_id
+        description: Identificador CVE que define o grao da dimensao.
+        data_tests:
+          - not_null
+          - unique
+      - name: fonte_publicadora
+        description: Identificador da fonte que publicou a entrada no NVD.
+      - name: descricao
+        description: Descricao em ingles disponibilizada pelo NVD.
+      - name: status_nvd
+        description: Estado do registro na NVD no snapshot processado.
+      - name: data_publicacao
+        description: Data de publicacao da vulnerabilidade na NVD.
+      - name: data_ultima_modificacao
+        description: Data da ultima modificacao informada pela NVD.
+      - name: severidade_cvss
+        description: >
+          Severidade da metrica CVSS selecionada pelo projeto. Pode estar
+          ausente e nao deve ser confundida com probabilidade de exploracao.
+      - name: versao_cvss
+        description: Versao da metrica CVSS escolhida pela politica local.
+      - name: fonte_cvss
+        description: Fonte da metrica CVSS selecionada.
+      - name: tipo_cvss
+        description: Tipo da metrica CVSS selecionada, como Primary.
+      - name: vetor_cvss
+        description: Vetor CVSS associado a metrica selecionada.
+      - name: cwes
+        description: Codigos CWE extraidos do registro, preservados como texto.
+
+  - name: fato_risco_cve
+    description: >
+      Indicadores de cada CVE da NVD no conjunto de snapshots utilizado.
+      O grao e uma linha por CVE. Os indicadores nao representam observacoes
+      historicas repetidas nem comprovam capacidade preditiva.
+    columns:
+      - name: cve_id
+        description: Identificador CVE; chave da fato e referencia a dim_cve.
+        data_tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('dim_cve')
+                field: cve_id
+      - name: pontuacao_cvss
+        description: >
+          Pontuacao base da metrica CVSS selecionada, entre zero e dez;
+          pode estar ausente. Versoes diferentes nao sao intercambiaveis
+          automaticamente em comparacoes estatisticas.
+      - name: qtd_metricas_cvss
+        description: Numero de metricas validas na versao CVSS selecionada.
+      - name: selecao_cvss_ambigua
+        description: >
+          Marca mais de uma metrica candidata apos os criterios locais de
+          preferencia; a escolha final utiliza desempate deterministico.
+      - name: qtd_referencias
+        description: Quantidade de referencias da CVE no registro NVD.
+      - name: qtd_fraquezas
+        description: Quantidade de grupos de fraquezas informados na NVD.
+      - name: sem_pontuacao_cvss
+        description: Indica ausencia de pontuacao base CVSS na CVE.
+      - name: vetor_ataque_rede
+        description: >
+          Indica AV:N no vetor CVSS selecionado. Pode ser nulo se nao houver
+          vetor; nao indica exploracao efetiva.
+      - name: referencias_extremas
+        description: >
+          Marca quantidade de referencias fora dos limites do IQR; nao
+          significa dado incorreto e nao remove a linha.
+      - name: probabilidade_epss
+        description: >
+          Probabilidade estimada de exploracao nos proximos 30 dias segundo
+          o EPSS do snapshot utilizado; nao e observacao de exploracao real.
+      - name: percentil_epss
+        description: Percentil relativo do EPSS, entre zero e um.
+      - name: tem_epss
+        description: Indica correspondencia da CVE com a fonte EPSS.
+      - name: consta_kev
+        description: >
+          Indica presenca da CVE no catalogo CISA KEV carregado. Falso
+          significa nao catalogada nesse snapshot, nao comprovacao de
+          ausencia de exploracao.
+      - name: data_inclusao_kev
+        description: >
+          Data de inclusao da CVE no catalogo CISA KEV; nao e necessariamente
+          a data da primeira exploracao.
+      - name: uso_ransomware_kev
+        description: >
+          Indicacao do catalogo KEV sobre uso em campanhas de ransomware.
+          Valores como Unknown nao devem ser interpretados como No.
+      - name: cvss_alto_epss_top10
+        description: >
+          Flag exploratoria: verdadeira quando severidade_cvss e HIGH ou
+          CRITICAL e percentil_epss e maior ou igual a 0,90. E nula quando
+          falta severidade ou percentil. Nao e previsao de exploracao.
+
+  - name: vw_vulnerabilidades_completas
+    description: >
+      View de leitura que relaciona fato_risco_cve a dim_cve pelo CVE ID,
+      reunindo indicadores de risco e atributos descritivos sem gravar
+      novamente uma copia da tabela. Herda o grao de uma linha por CVE.
+    columns:
+      - name: cve_id
+        description: Identificador CVE comum a dimensao e a fato.
